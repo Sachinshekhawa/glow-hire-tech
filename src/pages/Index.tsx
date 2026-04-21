@@ -1,16 +1,43 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import Header from "@/components/landing/Header";
+import Hero from "@/components/landing/Hero";
+import LogoCloud from "@/components/landing/LogoCloud";
+import Showcase from "@/components/landing/Showcase";
+import Differentiators from "@/components/landing/Differentiators";
+import CommunicationHub from "@/components/landing/CommunicationHub";
+import Features from "@/components/landing/Features";
+import HowItWorks from "@/components/landing/HowItWorks";
+import Automation from "@/components/landing/Automation";
+import Roi from "@/components/landing/Roi";
+import UseCases from "@/components/landing/UseCases";
+import Testimonials from "@/components/landing/Testimonials";
+import Pricing from "@/components/landing/Pricing";
+import CtaForm from "@/components/landing/CtaForm";
+import Footer from "@/components/landing/Footer";
+import FloatingAssistant from "@/components/landing/FloatingAssistant";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <Header />
+      <main>
+        <Hero />
+        <LogoCloud />
+        <Showcase />
+        <Differentiators />
+        <CommunicationHub />
+        <Features />
+        <HowItWorks />
+        <Automation />
+        <Roi />
+        <UseCases />
+        <Testimonials />
+        <Pricing />
+        <CtaForm />
+      </main>
+      <Footer />
+      <FloatingAssistant />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
