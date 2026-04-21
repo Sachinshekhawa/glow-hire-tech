@@ -11,6 +11,7 @@ import Roi from "@/components/landing/Roi";
 import UseCases from "@/components/landing/UseCases";
 import Testimonials from "@/components/landing/Testimonials";
 import Pricing from "@/components/landing/Pricing";
+import Blog from "@/components/landing/Blog";
 import CtaForm from "@/components/landing/CtaForm";
 import Footer from "@/components/landing/Footer";
 import FloatingAssistant from "@/components/landing/FloatingAssistant";
@@ -32,6 +33,7 @@ const Index = () => {
         <UseCases />
         <Testimonials />
         <Pricing />
+        <Blog />
         <CtaForm />
       </main>
       <Footer />
