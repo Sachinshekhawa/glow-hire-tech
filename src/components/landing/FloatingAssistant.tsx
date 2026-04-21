@@ -33,7 +33,7 @@ const FloatingAssistant = () => {
               <div>
                 <div className="font-semibold text-primary-foreground text-sm">Glohire AI</div>
                 <div className="text-xs text-primary-foreground/80 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
                   Online · Replies instantly
                 </div>
               </div>
