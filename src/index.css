@@ -139,9 +139,10 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(187 95% 45% / 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 80% 30%, hsl(265 85% 60% / 0.05), transparent);
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--bg-glow-1)), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 30%, hsl(var(--bg-glow-2)), transparent);
     background-attachment: fixed;
+    transition: background-color 0.3s var(--transition-smooth), color 0.3s var(--transition-smooth);
   }
 
   h1, h2, h3, h4, h5, h6 {
