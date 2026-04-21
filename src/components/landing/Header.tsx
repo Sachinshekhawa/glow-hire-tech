@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Sparkles } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const navLinks = [
   { label: "Product", href: "#showcase" },
@@ -51,6 +52,7 @@ const Header = () => {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
           <Button variant="ghost" size="sm" asChild>
             <a href="#cta">Sign in</a>
           </Button>
@@ -59,13 +61,16 @@ const Header = () => {
           </Button>
         </div>
 
-        <button
-          className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-md border border-border"
-          onClick={() => setOpen((s) => !s)}
-          aria-label="Toggle menu"
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="md:hidden flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border"
+            onClick={() => setOpen((s) => !s)}
+            aria-label="Toggle menu"
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {open && (
