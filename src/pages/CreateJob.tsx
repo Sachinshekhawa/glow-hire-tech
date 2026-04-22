@@ -7,12 +7,15 @@ import {
   Check,
   Copy,
   Download,
+  Pencil,
   RefreshCw,
   Send,
   Settings2,
   Sparkles,
+  Sparkle,
   User,
   UserRound,
+  Wand2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +26,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -35,6 +46,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
+import { extractAnswersFromText } from "@/data/answerExtractor";
 import { Client, POC } from "@/data/clients";
 import { loadClients } from "@/data/clientsStore";
 
@@ -146,6 +158,8 @@ const CreateJob = () => {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [selectedPocId, setSelectedPocId] = useState<string>("");
   const [clientSubmitted, setClientSubmitted] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [autoFilledIds, setAutoFilledIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const selectedClient = useMemo(
@@ -250,6 +264,20 @@ const CreateJob = () => {
         return;
       }
     }
+
+    // Detect bonus answers in the same utterance — only meaningful when
+    // the user typed free text (not when they tapped a suggestion pill).
+    const isFreeText =
+      currentQuestion.inputType === "free_text" && typeof value === "string";
+    const extras = isFreeText
+      ? extractAnswersFromText(value as string, questions, currentQuestion.id)
+      : {};
+    // Don't overwrite anything the user has already answered explicitly
+    const newExtras: Record<string, string | string[]> = {};
+    Object.entries(extras).forEach(([qid, v]) => {
+      if (answers[qid] == null) newExtras[qid] = v;
+    });
+
     setMessages((prev) => [
       ...prev,
       {
@@ -259,9 +287,37 @@ const CreateJob = () => {
         questionId: currentQuestion.id,
       },
     ]);
-    setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+    setAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: value,
+      ...newExtras,
+    }));
     setTextInput("");
     setMultiPick([]);
+
+    if (Object.keys(newExtras).length > 0) {
+      setAutoFilledIds((prev) => {
+        const next = new Set(prev);
+        Object.keys(newExtras).forEach((id) => next.add(id));
+        return next;
+      });
+      const labels = Object.keys(newExtras)
+        .map((id) => questions.find((q) => q.id === id)?.text)
+        .filter(Boolean) as string[];
+      const previewMsg: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        kind: "info",
+        text: `✨ I picked up ${labels.length} more answer${
+          labels.length === 1 ? "" : "s"
+        } from your message:\n• ${labels.join("\n• ")}\n\nYou can edit any of them from the Live Summary panel before I generate the JD.`,
+      };
+      setMessages((prev) => [...prev, previewMsg]);
+      toast({
+        title: `Auto-filled ${labels.length} answer${labels.length === 1 ? "" : "s"}`,
+        description: "Review or edit them anytime from the Live Summary.",
+      });
+    }
   };
 
   const skip = () => {
@@ -278,12 +334,35 @@ const CreateJob = () => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: "" }));
   };
 
+  const updateAnswer = (qid: string, value: string | string[]) => {
+    setAnswers((prev) => ({ ...prev, [qid]: value }));
+    setAutoFilledIds((prev) => {
+      const next = new Set(prev);
+      next.delete(qid);
+      return next;
+    });
+    // If JD is already on screen, regenerate it
+    setMessages((prev) => {
+      const idx = [...prev].reverse().findIndex((m) => (m as any).kind === "jd");
+      if (idx === -1) return prev;
+      const realIdx = prev.length - 1 - idx;
+      const nextAnswers = { ...answers, [qid]: value };
+      const jd = buildJD(questions, nextAnswers);
+      const copy = [...prev];
+      copy[realIdx] = { ...copy[realIdx], text: jd } as ChatMessage;
+      return copy;
+    });
+    toast({ title: "Answer updated" });
+  };
+
   const restart = () => {
     setAnswers({});
     setMessages([]);
     setCompleted(false);
     setTextInput("");
     setMultiPick([]);
+    setAutoFilledIds(new Set());
+    setEditingId(null);
     setSelectedClientId("");
     setSelectedPocId("");
     setClientSubmitted(false);
@@ -503,8 +582,9 @@ const CreateJob = () => {
                   const display = Array.isArray(a)
                     ? a.join(", ")
                     : (a as string) || "—";
+                  const wasAuto = autoFilledIds.has(q.id);
                   return (
-                    <li key={q.id} className="text-sm">
+                    <li key={q.id} className="text-sm group">
                       <div className="flex items-center gap-2">
                         <span
                           className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
@@ -515,9 +595,27 @@ const CreateJob = () => {
                         >
                           {answered ? <Check className="h-2.5 w-2.5" /> : "•"}
                         </span>
-                        <span className="text-muted-foreground line-clamp-1">
+                        <span className="text-muted-foreground line-clamp-1 flex-1">
                           {q.text}
                         </span>
+                        {wasAuto && (
+                          <Badge
+                            variant="secondary"
+                            className="gap-1 text-[9px] px-1.5 py-0 h-4 border border-primary/30 text-primary"
+                          >
+                            <Wand2 className="h-2.5 w-2.5" />
+                            auto
+                          </Badge>
+                        )}
+                        {answered && (
+                          <button
+                            onClick={() => setEditingId(q.id)}
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                            aria-label={`Edit answer for ${q.text}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                       {answered && (
                         <p className="ml-6 mt-1 text-foreground line-clamp-2">
@@ -569,6 +667,18 @@ const CreateJob = () => {
           />
         )}
       </main>
+
+      <EditAnswerDialog
+        question={
+          editingId ? questions.find((q) => q.id === editingId) || null : null
+        }
+        currentValue={editingId ? answers[editingId] : undefined}
+        onClose={() => setEditingId(null)}
+        onSave={(qid, value) => {
+          updateAnswer(qid, value);
+          setEditingId(null);
+        }}
+      />
     </div>
   );
 };
@@ -1041,6 +1151,159 @@ const AnswerInput = ({
         {question.required ? "Required" : "Optional"}
       </p>
     </div>
+  );
+};
+
+const EditAnswerDialog = ({
+  question,
+  currentValue,
+  onClose,
+  onSave,
+}: {
+  question: ChatQuestion | null;
+  currentValue: string | string[] | undefined;
+  onClose: () => void;
+  onSave: (qid: string, value: string | string[]) => void;
+}) => {
+  const [text, setText] = useState("");
+  const [multi, setMulti] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!question) return;
+    if (question.inputType === "multi_select") {
+      setMulti(Array.isArray(currentValue) ? currentValue : []);
+      setText("");
+    } else {
+      setText(typeof currentValue === "string" ? currentValue : "");
+      setMulti([]);
+    }
+  }, [question, currentValue]);
+
+  if (!question) return null;
+
+  const handleSave = () => {
+    if (question.inputType === "multi_select") {
+      onSave(question.id, multi);
+    } else {
+      onSave(question.id, text.trim());
+    }
+  };
+
+  const toggleMulti = (opt: string) =>
+    setMulti((prev) =>
+      prev.includes(opt) ? prev.filter((o) => o !== opt) : [...prev, opt],
+    );
+
+  return (
+    <Dialog open={!!question} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-primary" />
+            Edit answer
+          </DialogTitle>
+          <DialogDescription>{question.text}</DialogDescription>
+        </DialogHeader>
+
+        <div className="py-2">
+          {question.inputType === "single_select" ? (
+            <div className="flex flex-wrap gap-2">
+              {question.options.map((opt) => {
+                const active = text === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => setText(opt)}
+                    className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                      active
+                        ? "border-primary bg-primary/15 text-foreground"
+                        : "border-border bg-card hover:border-primary/60"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          ) : question.inputType === "multi_select" ? (
+            <>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {question.options.map((opt) => {
+                  const active = multi.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => toggleMulti(opt)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                        active
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border bg-card hover:border-primary/60"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={active}
+                        className="pointer-events-none h-3.5 w-3.5"
+                      />
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {multi.length} selected
+              </p>
+            </>
+          ) : (
+            <Textarea
+              autoFocus
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your answer…"
+              className="min-h-[96px]"
+            />
+          )}
+
+          {question.suggestedEnabled &&
+            question.inputType === "free_text" &&
+            question.options.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+                  Suggestions
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {question.options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setText(opt)}
+                      className="px-3 py-1 rounded-full border border-border bg-card text-xs text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="hero"
+            onClick={handleSave}
+            disabled={
+              question.inputType === "multi_select"
+                ? multi.length === 0 && question.required
+                : !text.trim() && question.required
+            }
+          >
+            <Sparkle className="h-4 w-4" />
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
