@@ -9,6 +9,7 @@ import BlogIndex from "./pages/Blog.tsx";
 import BlogPost from "./pages/BlogPost.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import SystemBehavior from "./pages/SystemBehavior.tsx";
+import CreateJob from "./pages/CreateJob.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/admin/system-behavior" element={<SystemBehavior />} />
+            <Route path="/create-job" element={<CreateJob />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
