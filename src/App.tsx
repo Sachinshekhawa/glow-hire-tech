@@ -9,6 +9,7 @@ import BlogIndex from "./pages/Blog.tsx";
 import BlogPost from "./pages/BlogPost.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import SystemBehavior from "./pages/SystemBehavior.tsx";
+import ClientFieldsAdmin from "./pages/ClientFieldsAdmin.tsx";
 import CreateJob from "./pages/CreateJob.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/admin/system-behavior" element={<SystemBehavior />} />
+            <Route path="/admin/client-fields" element={<ClientFieldsAdmin />} />
             <Route path="/create-job" element={<CreateJob />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
