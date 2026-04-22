@@ -445,14 +445,16 @@ const CreateJob = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary" />
-                      Job description ready
+                      {clientSubmitted
+                        ? "Job, client & POC saved"
+                        : "JD ready — add client & POC below"}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={copyJD}>
-                        <Copy className="h-4 w-4" /> Copy
+                        <Copy className="h-4 w-4" /> Copy JD
                       </Button>
                       <Button variant="outline" size="sm" onClick={downloadJD}>
-                        <Download className="h-4 w-4" /> Download
+                        <Download className="h-4 w-4" /> Download JD
                       </Button>
                       <Button variant="hero" size="sm" onClick={restart}>
                         <RefreshCw className="h-4 w-4" /> New Job
