@@ -137,12 +137,23 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const CreateJob = () => {
   const { toast } = useToast();
   const [questions] = useState<ChatQuestion[]>(() => loadQuestions());
+  const [clientFields] = useState<ClientField[]>(() => loadClientFields());
   const [answers, setAnswers] = useState<Answers>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState("");
   const [multiPick, setMultiPick] = useState<string[]>([]);
   const [completed, setCompleted] = useState(false);
+  const [clientValues, setClientValues] = useState<Record<string, string>>({});
+  const [clientSubmitted, setClientSubmitted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const activeClientFields = useMemo(
+    () =>
+      [...clientFields]
+        .filter((f) => f.active)
+        .sort((a, b) => a.order - b.order),
+    [clientFields],
+  );
 
   // Eligible question pipeline based on current answers
   const eligibleQueue = useMemo(
