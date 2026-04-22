@@ -574,26 +574,31 @@ const CreateJob = () => {
 };
 
 const ClientPocSection = ({
-  fields,
-  values,
-  onChange,
+  clients,
+  selectedClientId,
+  selectedPocId,
+  onSelectClient,
+  onSelectPoc,
   onSubmit,
   submitted,
   onEdit,
   onDownloadInternal,
 }: {
-  fields: ClientField[];
-  values: Record<string, string>;
-  onChange: (id: string, v: string) => void;
+  clients: Client[];
+  selectedClientId: string;
+  selectedPocId: string;
+  onSelectClient: (id: string) => void;
+  onSelectPoc: (id: string) => void;
   onSubmit: () => void;
   submitted: boolean;
   onEdit: () => void;
   onDownloadInternal: () => void;
 }) => {
-  const clientFs = fields.filter((f) => f.group === "client");
-  const pocFs = fields.filter((f) => f.group === "poc");
+  const selectedClient = clients.find((c) => c.id === selectedClientId) || null;
+  const selectedPoc =
+    selectedClient?.pocs.find((p) => p.id === selectedPocId) || null;
 
-  if (fields.length === 0) {
+  if (clients.length === 0) {
     return (
       <Card className="mt-6 p-6 border-dashed border-border/60">
         <div className="flex items-start gap-3">
@@ -602,17 +607,17 @@ const ClientPocSection = ({
           </div>
           <div>
             <h2 className="font-display text-base font-semibold">
-              Client &amp; POC capture
+              No clients in your directory
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              No active client/POC fields configured.{" "}
+              Add clients and their POCs in{" "}
               <Link
                 to="/admin/client-fields"
                 className="text-primary underline-offset-4 hover:underline"
               >
-                Configure in System Behavior
+                System Behavior → Clients &amp; POCs
               </Link>
-              .
+              , then come back to assign one to this job.
             </p>
           </div>
         </div>
@@ -631,14 +636,13 @@ const ClientPocSection = ({
             </span>
             <div>
               <h2 className="font-display text-lg font-semibold">
-                Client &amp; Point of Contact
+                Assign Client &amp; Point of Contact
               </h2>
               <p className="text-xs text-muted-foreground">
-                Internal-only — these details are stored with the job but{" "}
+                Select an existing client and POC from your directory.{" "}
                 <span className="text-foreground font-medium">
-                  never appear in the JD
+                  Never appears in the JD.
                 </span>
-                .
               </p>
             </div>
           </div>
@@ -648,28 +652,18 @@ const ClientPocSection = ({
           </Badge>
         </div>
 
-        {submitted ? (
+        {submitted && selectedClient && selectedPoc ? (
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <SubmittedGroup
-              title="Client details"
-              icon={<Building2 className="h-3.5 w-3.5" />}
-              fields={clientFs}
-              values={values}
-            />
-            <SubmittedGroup
-              title="Point of Contact"
-              icon={<UserRound className="h-3.5 w-3.5" />}
-              fields={pocFs}
-              values={values}
-            />
+            <SelectedClientCard client={selectedClient} />
+            <SelectedPocCard poc={selectedPoc} />
             <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Check className="h-4 w-4 text-primary" />
-                Client &amp; POC saved with this job
+                Linked to this job
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={onEdit}>
-                  Edit
+                  Change selection
                 </Button>
                 <Button
                   variant="outline"
@@ -684,34 +678,115 @@ const ClientPocSection = ({
         ) : (
           <>
             <div className="mt-5 grid gap-6 md:grid-cols-2">
-              <FieldGroup
-                title="Client details"
-                icon={<Building2 className="h-4 w-4" />}
-                fields={clientFs}
-                values={values}
-                onChange={onChange}
-              />
-              <FieldGroup
-                title="Point of Contact"
-                icon={<UserRound className="h-4 w-4" />}
-                fields={pocFs}
-                values={values}
-                onChange={onChange}
-              />
+              {/* Client picker */}
+              <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-sm font-semibold">Client</h3>
+                </div>
+                <Label htmlFor="client-pick" className="text-xs">
+                  Select client
+                  <span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <Select value={selectedClientId} onValueChange={onSelectClient}>
+                  <SelectTrigger id="client-pick" className="mt-1.5">
+                    <SelectValue placeholder="Choose a client..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.industry ? ` · ${c.industry}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedClient && (
+                  <div className="mt-3 rounded-lg bg-secondary/40 p-3 text-xs text-muted-foreground space-y-1">
+                    {selectedClient.location && (
+                      <div>📍 {selectedClient.location}</div>
+                    )}
+                    {selectedClient.website && (
+                      <div className="truncate">🌐 {selectedClient.website}</div>
+                    )}
+                    <div>
+                      👥 {selectedClient.pocs.length} POC
+                      {selectedClient.pocs.length === 1 ? "" : "s"} on file
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* POC picker */}
+              <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <UserRound className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-sm font-semibold">Point of Contact</h3>
+                </div>
+                <Label htmlFor="poc-pick" className="text-xs">
+                  Select POC
+                  <span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <Select
+                  value={selectedPocId}
+                  onValueChange={onSelectPoc}
+                  disabled={!selectedClient}
+                >
+                  <SelectTrigger id="poc-pick" className="mt-1.5">
+                    <SelectValue
+                      placeholder={
+                        selectedClient
+                          ? selectedClient.pocs.length === 0
+                            ? "No POCs for this client"
+                            : "Choose a POC..."
+                          : "Select a client first"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedClient?.pocs.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                        {p.designation ? ` · ${p.designation}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPoc && (
+                  <div className="mt-3 rounded-lg bg-secondary/40 p-3 text-xs text-muted-foreground space-y-1">
+                    <div className="truncate">✉️ {selectedPoc.email}</div>
+                    {selectedPoc.phone && <div>📞 {selectedPoc.phone}</div>}
+                    {selectedPoc.notes && (
+                      <div className="italic line-clamp-2">
+                        “{selectedPoc.notes}”
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/60">
               <p className="text-xs text-muted-foreground">
-                Manage these fields in{" "}
+                Don't see them? Add new clients or POCs in{" "}
                 <Link
                   to="/admin/client-fields"
                   className="text-primary underline-offset-4 hover:underline"
                 >
-                  System Behavior → Client &amp; POC fields
+                  System Behavior → Clients &amp; POCs
                 </Link>
                 .
               </p>
-              <Button variant="hero" size="sm" onClick={onSubmit}>
-                <Check className="h-4 w-4" /> Save client &amp; POC
+              <Button
+                variant="hero"
+                size="sm"
+                onClick={onSubmit}
+                disabled={!selectedClient || !selectedPoc}
+              >
+                <Check className="h-4 w-4" /> Link to job
               </Button>
             </div>
           </>
@@ -721,119 +796,46 @@ const ClientPocSection = ({
   );
 };
 
-const FieldGroup = ({
-  title,
-  icon,
-  fields,
-  values,
-  onChange,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  fields: ClientField[];
-  values: Record<string, string>;
-  onChange: (id: string, v: string) => void;
-}) => {
-  if (fields.length === 0) return null;
-  return (
-    <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-          {icon}
-        </span>
-        <h3 className="text-sm font-semibold">{title}</h3>
-      </div>
-      <div className="space-y-3">
-        {fields.map((f) => (
-          <div key={f.id} className="space-y-1.5">
-            <Label htmlFor={f.id} className="text-xs">
-              {f.label}
-              {f.required && <span className="text-destructive ml-0.5">*</span>}
-            </Label>
-            {f.type === "textarea" ? (
-              <Textarea
-                id={f.id}
-                value={values[f.id] ?? ""}
-                onChange={(e) => onChange(f.id, e.target.value)}
-                placeholder={f.placeholder}
-                className="min-h-[72px]"
-              />
-            ) : f.type === "single_select" ? (
-              <Select
-                value={values[f.id] ?? ""}
-                onValueChange={(v) => onChange(f.id, v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={f.placeholder || "Select..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {f.options.map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input
-                id={f.id}
-                type={
-                  f.type === "email"
-                    ? "email"
-                    : f.type === "phone"
-                    ? "tel"
-                    : f.type === "url"
-                    ? "url"
-                    : "text"
-                }
-                value={values[f.id] ?? ""}
-                onChange={(e) => onChange(f.id, e.target.value)}
-                placeholder={f.placeholder}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+const SelectedClientCard = ({ client }: { client: Client }) => (
+  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+    <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <Building2 className="h-3.5 w-3.5" />
+      Client
     </div>
-  );
-};
+    <p className="text-base font-display font-semibold">{client.name}</p>
+    {client.industry && (
+      <Badge variant="secondary" className="mt-1 text-[10px]">
+        {client.industry}
+      </Badge>
+    )}
+    <dl className="mt-3 space-y-1.5 text-xs">
+      {client.location && (
+        <div className="text-muted-foreground">📍 {client.location}</div>
+      )}
+      {client.website && (
+        <div className="truncate text-muted-foreground">🌐 {client.website}</div>
+      )}
+    </dl>
+  </div>
+);
 
-const SubmittedGroup = ({
-  title,
-  icon,
-  fields,
-  values,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  fields: ClientField[];
-  values: Record<string, string>;
-}) => {
-  if (fields.length === 0) return null;
-  return (
-    <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-      <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {icon}
-        {title}
-      </div>
-      <dl className="space-y-2">
-        {fields.map((f) => {
-          const v = values[f.id]?.trim();
-          return (
-            <div key={f.id} className="flex flex-col">
-              <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                {f.label}
-              </dt>
-              <dd className="text-sm text-foreground break-words">
-                {v || <span className="text-muted-foreground">—</span>}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
+const SelectedPocCard = ({ poc }: { poc: POC }) => (
+  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+    <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <UserRound className="h-3.5 w-3.5" />
+      Point of Contact
     </div>
-  );
-};
+    <p className="text-base font-display font-semibold">{poc.name}</p>
+    {poc.designation && (
+      <p className="text-xs text-muted-foreground">{poc.designation}</p>
+    )}
+    <dl className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+      <div className="truncate">✉️ {poc.email}</div>
+      {poc.phone && <div>📞 {poc.phone}</div>}
+      {poc.notes && <div className="italic line-clamp-2">“{poc.notes}”</div>}
+    </dl>
+  </div>
+);
 
 const MessageBubble = ({ message }: { message: ChatMessage }) => {
   if (message.role === "assistant" && message.kind === "jd") {
