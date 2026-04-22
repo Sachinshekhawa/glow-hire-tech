@@ -284,7 +284,8 @@ const CreateJob = () => {
     setCompleted(false);
     setTextInput("");
     setMultiPick([]);
-    setClientValues({});
+    setSelectedClientId("");
+    setSelectedPocId("");
     setClientSubmitted(false);
   };
 
@@ -318,26 +319,24 @@ const CreateJob = () => {
   };
 
   const downloadInternal = () => {
-    if (!clientSubmitted) return;
+    if (!clientSubmitted || !selectedClient || !selectedPoc) return;
     const lines: string[] = [];
     lines.push(`# Internal: Client & POC — ${(answers["q-1"] as string) || "Job"}`);
     lines.push("");
-    lines.push("> This file is for internal recruiter use only. Do NOT share with candidates.");
+    lines.push("> Internal recruiter use only. Do NOT share with candidates.");
     lines.push("");
-    const groups: Array<["client" | "poc", string]> = [
-      ["client", "Client details"],
-      ["poc", "Point of Contact"],
-    ];
-    groups.forEach(([g, title]) => {
-      const fs = activeClientFields.filter((f) => f.group === g);
-      if (fs.length === 0) return;
-      lines.push(`## ${title}`);
-      fs.forEach((f) => {
-        const v = clientValues[f.id]?.trim();
-        if (v) lines.push(`- **${f.label}:** ${v}`);
-      });
-      lines.push("");
-    });
+    lines.push("## Client");
+    lines.push(`- **Name:** ${selectedClient.name}`);
+    if (selectedClient.industry) lines.push(`- **Industry:** ${selectedClient.industry}`);
+    if (selectedClient.location) lines.push(`- **Location:** ${selectedClient.location}`);
+    if (selectedClient.website) lines.push(`- **Website:** ${selectedClient.website}`);
+    lines.push("");
+    lines.push("## Point of Contact");
+    lines.push(`- **Name:** ${selectedPoc.name}`);
+    if (selectedPoc.designation) lines.push(`- **Designation:** ${selectedPoc.designation}`);
+    lines.push(`- **Email:** ${selectedPoc.email}`);
+    if (selectedPoc.phone) lines.push(`- **Phone:** ${selectedPoc.phone}`);
+    if (selectedPoc.notes) lines.push(`- **Notes:** ${selectedPoc.notes}`);
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -348,21 +347,18 @@ const CreateJob = () => {
   };
 
   const submitClientForm = () => {
-    const missing = activeClientFields.filter(
-      (f) => f.required && !clientValues[f.id]?.trim(),
-    );
-    if (missing.length > 0) {
-      toast({
-        title: "Missing required fields",
-        description: missing.map((f) => f.label).join(", "),
-        variant: "destructive",
-      });
+    if (!selectedClient) {
+      toast({ title: "Select a client", variant: "destructive" });
+      return;
+    }
+    if (!selectedPoc) {
+      toast({ title: "Select a point of contact", variant: "destructive" });
       return;
     }
     setClientSubmitted(true);
     toast({
-      title: "Client & POC saved",
-      description: "Stored with this job — kept separate from the JD.",
+      title: "Client & POC linked",
+      description: `${selectedClient.name} · ${selectedPoc.name}`,
     });
   };
 
