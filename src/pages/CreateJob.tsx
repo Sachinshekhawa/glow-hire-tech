@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Bot,
+  Building2,
   Check,
   Copy,
   Download,
@@ -11,19 +12,31 @@ import {
   Settings2,
   Sparkles,
   User,
+  UserRound,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
+import { ClientField } from "@/data/clientFields";
+import { loadClientFields } from "@/data/clientFieldsStore";
 
 type ChatMessage =
   | { id: string; role: "assistant"; kind: "question"; questionId: string; text: string }
