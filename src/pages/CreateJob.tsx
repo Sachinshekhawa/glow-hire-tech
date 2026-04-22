@@ -554,11 +554,14 @@ const CreateJob = () => {
         {/* Post-JD: Client & POC capture */}
         {completed && (
           <ClientPocSection
-            fields={activeClientFields}
-            values={clientValues}
-            onChange={(id, v) =>
-              setClientValues((prev) => ({ ...prev, [id]: v }))
-            }
+            clients={clients}
+            selectedClientId={selectedClientId}
+            selectedPocId={selectedPocId}
+            onSelectClient={(id) => {
+              setSelectedClientId(id);
+              setSelectedPocId("");
+            }}
+            onSelectPoc={setSelectedPocId}
             onSubmit={submitClientForm}
             submitted={clientSubmitted}
             onEdit={() => setClientSubmitted(false)}
