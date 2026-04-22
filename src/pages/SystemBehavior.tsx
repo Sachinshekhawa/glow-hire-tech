@@ -76,6 +76,7 @@ import {
   aiGenerateOptions,
 } from "@/data/chatQuestions";
 import { loadQuestions, saveQuestions } from "@/data/chatQuestionsStore";
+import { SectionSwitcher } from "./ClientFieldsAdmin";
 
 const MAX_WORDS = 50;
 const MAX_OPTIONS = 50;
@@ -331,8 +332,10 @@ const SystemBehavior = () => {
       </header>
 
       <main className="container py-8 md:py-12">
+        <SectionSwitcher current="questions" />
+
         {/* Page heading */}
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               <ListChecks className="h-3.5 w-3.5" />

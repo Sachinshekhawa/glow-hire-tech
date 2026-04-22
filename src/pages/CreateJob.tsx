@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Bot,
+  Building2,
   Check,
   Copy,
   Download,
@@ -11,19 +12,31 @@ import {
   Settings2,
   Sparkles,
   User,
+  UserRound,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
+import { ClientField } from "@/data/clientFields";
+import { loadClientFields } from "@/data/clientFieldsStore";
 
 type ChatMessage =
   | { id: string; role: "assistant"; kind: "question"; questionId: string; text: string }
@@ -124,12 +137,23 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const CreateJob = () => {
   const { toast } = useToast();
   const [questions] = useState<ChatQuestion[]>(() => loadQuestions());
+  const [clientFields] = useState<ClientField[]>(() => loadClientFields());
   const [answers, setAnswers] = useState<Answers>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState("");
   const [multiPick, setMultiPick] = useState<string[]>([]);
   const [completed, setCompleted] = useState(false);
+  const [clientValues, setClientValues] = useState<Record<string, string>>({});
+  const [clientSubmitted, setClientSubmitted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const activeClientFields = useMemo(
+    () =>
+      [...clientFields]
+        .filter((f) => f.active)
+        .sort((a, b) => a.order - b.order),
+    [clientFields],
+  );
 
   // Eligible question pipeline based on current answers
   const eligibleQueue = useMemo(
@@ -258,6 +282,8 @@ const CreateJob = () => {
     setCompleted(false);
     setTextInput("");
     setMultiPick([]);
+    setClientValues({});
+    setClientSubmitted(false);
   };
 
   const totalActive = eligibleQueue.length || 1;
@@ -274,17 +300,68 @@ const CreateJob = () => {
     toast({ title: "Copied", description: "Job description copied to clipboard." });
   };
 
+  const fileSlug =
+    (answers["q-1"] as string)?.toLowerCase().replace(/\s+/g, "-") ||
+    "job-description";
+
   const downloadJD = () => {
     if (!lastJd) return;
     const blob = new Blob([(lastJd as any).text], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const title =
-      (answers["q-1"] as string)?.toLowerCase().replace(/\s+/g, "-") || "job-description";
-    a.download = `${title}.md`;
+    a.download = `${fileSlug}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadInternal = () => {
+    if (!clientSubmitted) return;
+    const lines: string[] = [];
+    lines.push(`# Internal: Client & POC — ${(answers["q-1"] as string) || "Job"}`);
+    lines.push("");
+    lines.push("> This file is for internal recruiter use only. Do NOT share with candidates.");
+    lines.push("");
+    const groups: Array<["client" | "poc", string]> = [
+      ["client", "Client details"],
+      ["poc", "Point of Contact"],
+    ];
+    groups.forEach(([g, title]) => {
+      const fs = activeClientFields.filter((f) => f.group === g);
+      if (fs.length === 0) return;
+      lines.push(`## ${title}`);
+      fs.forEach((f) => {
+        const v = clientValues[f.id]?.trim();
+        if (v) lines.push(`- **${f.label}:** ${v}`);
+      });
+      lines.push("");
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileSlug}-client-poc.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const submitClientForm = () => {
+    const missing = activeClientFields.filter(
+      (f) => f.required && !clientValues[f.id]?.trim(),
+    );
+    if (missing.length > 0) {
+      toast({
+        title: "Missing required fields",
+        description: missing.map((f) => f.label).join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+    setClientSubmitted(true);
+    toast({
+      title: "Client & POC saved",
+      description: "Stored with this job — kept separate from the JD.",
+    });
   };
 
   return (
@@ -368,14 +445,16 @@ const CreateJob = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary" />
-                      Job description ready
+                      {clientSubmitted
+                        ? "Job, client & POC saved"
+                        : "JD ready — add client & POC below"}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={copyJD}>
-                        <Copy className="h-4 w-4" /> Copy
+                        <Copy className="h-4 w-4" /> Copy JD
                       </Button>
                       <Button variant="outline" size="sm" onClick={downloadJD}>
-                        <Download className="h-4 w-4" /> Download
+                        <Download className="h-4 w-4" /> Download JD
                       </Button>
                       <Button variant="hero" size="sm" onClick={restart}>
                         <RefreshCw className="h-4 w-4" /> New Job
@@ -473,7 +552,284 @@ const CreateJob = () => {
             </Card>
           </aside>
         </div>
+
+        {/* Post-JD: Client & POC capture */}
+        {completed && (
+          <ClientPocSection
+            fields={activeClientFields}
+            values={clientValues}
+            onChange={(id, v) =>
+              setClientValues((prev) => ({ ...prev, [id]: v }))
+            }
+            onSubmit={submitClientForm}
+            submitted={clientSubmitted}
+            onEdit={() => setClientSubmitted(false)}
+            onDownloadInternal={downloadInternal}
+          />
+        )}
       </main>
+    </div>
+  );
+};
+
+const ClientPocSection = ({
+  fields,
+  values,
+  onChange,
+  onSubmit,
+  submitted,
+  onEdit,
+  onDownloadInternal,
+}: {
+  fields: ClientField[];
+  values: Record<string, string>;
+  onChange: (id: string, v: string) => void;
+  onSubmit: () => void;
+  submitted: boolean;
+  onEdit: () => void;
+  onDownloadInternal: () => void;
+}) => {
+  const clientFs = fields.filter((f) => f.group === "client");
+  const pocFs = fields.filter((f) => f.group === "poc");
+
+  if (fields.length === 0) {
+    return (
+      <Card className="mt-6 p-6 border-dashed border-border/60">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Building2 className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="font-display text-base font-semibold">
+              Client &amp; POC capture
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              No active client/POC fields configured.{" "}
+              <Link
+                to="/admin/client-fields"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Configure in System Behavior
+              </Link>
+              .
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-6 relative overflow-hidden border-border/60">
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+      <div className="relative p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
+              <Building2 className="h-4 w-4 text-primary-foreground" />
+            </span>
+            <div>
+              <h2 className="font-display text-lg font-semibold">
+                Client &amp; Point of Contact
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Internal-only — these details are stored with the job but{" "}
+                <span className="text-foreground font-medium">
+                  never appear in the JD
+                </span>
+                .
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="gap-1.5 border-primary/40 text-primary">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            Internal
+          </Badge>
+        </div>
+
+        {submitted ? (
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <SubmittedGroup
+              title="Client details"
+              icon={<Building2 className="h-3.5 w-3.5" />}
+              fields={clientFs}
+              values={values}
+            />
+            <SubmittedGroup
+              title="Point of Contact"
+              icon={<UserRound className="h-3.5 w-3.5" />}
+              fields={pocFs}
+              values={values}
+            />
+            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Check className="h-4 w-4 text-primary" />
+                Client &amp; POC saved with this job
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={onEdit}>
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onDownloadInternal}
+                >
+                  <Download className="h-4 w-4" /> Download internal sheet
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 grid gap-6 md:grid-cols-2">
+              <FieldGroup
+                title="Client details"
+                icon={<Building2 className="h-4 w-4" />}
+                fields={clientFs}
+                values={values}
+                onChange={onChange}
+              />
+              <FieldGroup
+                title="Point of Contact"
+                icon={<UserRound className="h-4 w-4" />}
+                fields={pocFs}
+                values={values}
+                onChange={onChange}
+              />
+            </div>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/60">
+              <p className="text-xs text-muted-foreground">
+                Manage these fields in{" "}
+                <Link
+                  to="/admin/client-fields"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  System Behavior → Client &amp; POC fields
+                </Link>
+                .
+              </p>
+              <Button variant="hero" size="sm" onClick={onSubmit}>
+                <Check className="h-4 w-4" /> Save client &amp; POC
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+const FieldGroup = ({
+  title,
+  icon,
+  fields,
+  values,
+  onChange,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  fields: ClientField[];
+  values: Record<string, string>;
+  onChange: (id: string, v: string) => void;
+}) => {
+  if (fields.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <h3 className="text-sm font-semibold">{title}</h3>
+      </div>
+      <div className="space-y-3">
+        {fields.map((f) => (
+          <div key={f.id} className="space-y-1.5">
+            <Label htmlFor={f.id} className="text-xs">
+              {f.label}
+              {f.required && <span className="text-destructive ml-0.5">*</span>}
+            </Label>
+            {f.type === "textarea" ? (
+              <Textarea
+                id={f.id}
+                value={values[f.id] ?? ""}
+                onChange={(e) => onChange(f.id, e.target.value)}
+                placeholder={f.placeholder}
+                className="min-h-[72px]"
+              />
+            ) : f.type === "single_select" ? (
+              <Select
+                value={values[f.id] ?? ""}
+                onValueChange={(v) => onChange(f.id, v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={f.placeholder || "Select..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {f.options.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id={f.id}
+                type={
+                  f.type === "email"
+                    ? "email"
+                    : f.type === "phone"
+                    ? "tel"
+                    : f.type === "url"
+                    ? "url"
+                    : "text"
+                }
+                value={values[f.id] ?? ""}
+                onChange={(e) => onChange(f.id, e.target.value)}
+                placeholder={f.placeholder}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SubmittedGroup = ({
+  title,
+  icon,
+  fields,
+  values,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  fields: ClientField[];
+  values: Record<string, string>;
+}) => {
+  if (fields.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+      <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {icon}
+        {title}
+      </div>
+      <dl className="space-y-2">
+        {fields.map((f) => {
+          const v = values[f.id]?.trim();
+          return (
+            <div key={f.id} className="flex flex-col">
+              <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {f.label}
+              </dt>
+              <dd className="text-sm text-foreground break-words">
+                {v || <span className="text-muted-foreground">—</span>}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
     </div>
   );
 };
