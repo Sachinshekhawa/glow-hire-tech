@@ -282,6 +282,8 @@ const CreateJob = () => {
     setCompleted(false);
     setTextInput("");
     setMultiPick([]);
+    setClientValues({});
+    setClientSubmitted(false);
   };
 
   const totalActive = eligibleQueue.length || 1;
@@ -298,17 +300,68 @@ const CreateJob = () => {
     toast({ title: "Copied", description: "Job description copied to clipboard." });
   };
 
+  const fileSlug =
+    (answers["q-1"] as string)?.toLowerCase().replace(/\s+/g, "-") ||
+    "job-description";
+
   const downloadJD = () => {
     if (!lastJd) return;
     const blob = new Blob([(lastJd as any).text], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const title =
-      (answers["q-1"] as string)?.toLowerCase().replace(/\s+/g, "-") || "job-description";
-    a.download = `${title}.md`;
+    a.download = `${fileSlug}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadInternal = () => {
+    if (!clientSubmitted) return;
+    const lines: string[] = [];
+    lines.push(`# Internal: Client & POC — ${(answers["q-1"] as string) || "Job"}`);
+    lines.push("");
+    lines.push("> This file is for internal recruiter use only. Do NOT share with candidates.");
+    lines.push("");
+    const groups: Array<["client" | "poc", string]> = [
+      ["client", "Client details"],
+      ["poc", "Point of Contact"],
+    ];
+    groups.forEach(([g, title]) => {
+      const fs = activeClientFields.filter((f) => f.group === g);
+      if (fs.length === 0) return;
+      lines.push(`## ${title}`);
+      fs.forEach((f) => {
+        const v = clientValues[f.id]?.trim();
+        if (v) lines.push(`- **${f.label}:** ${v}`);
+      });
+      lines.push("");
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileSlug}-client-poc.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const submitClientForm = () => {
+    const missing = activeClientFields.filter(
+      (f) => f.required && !clientValues[f.id]?.trim(),
+    );
+    if (missing.length > 0) {
+      toast({
+        title: "Missing required fields",
+        description: missing.map((f) => f.label).join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+    setClientSubmitted(true);
+    toast({
+      title: "Client & POC saved",
+      description: "Stored with this job — kept separate from the JD.",
+    });
   };
 
   return (
