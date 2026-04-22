@@ -264,6 +264,20 @@ const CreateJob = () => {
         return;
       }
     }
+
+    // Detect bonus answers in the same utterance — only meaningful when
+    // the user typed free text (not when they tapped a suggestion pill).
+    const isFreeText =
+      currentQuestion.inputType === "free_text" && typeof value === "string";
+    const extras = isFreeText
+      ? extractAnswersFromText(value as string, questions, currentQuestion.id)
+      : {};
+    // Don't overwrite anything the user has already answered explicitly
+    const newExtras: Record<string, string | string[]> = {};
+    Object.entries(extras).forEach(([qid, v]) => {
+      if (answers[qid] == null) newExtras[qid] = v;
+    });
+
     setMessages((prev) => [
       ...prev,
       {
@@ -273,9 +287,37 @@ const CreateJob = () => {
         questionId: currentQuestion.id,
       },
     ]);
-    setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+    setAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: value,
+      ...newExtras,
+    }));
     setTextInput("");
     setMultiPick([]);
+
+    if (Object.keys(newExtras).length > 0) {
+      setAutoFilledIds((prev) => {
+        const next = new Set(prev);
+        Object.keys(newExtras).forEach((id) => next.add(id));
+        return next;
+      });
+      const labels = Object.keys(newExtras)
+        .map((id) => questions.find((q) => q.id === id)?.text)
+        .filter(Boolean) as string[];
+      const previewMsg: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        kind: "info",
+        text: `✨ I picked up ${labels.length} more answer${
+          labels.length === 1 ? "" : "s"
+        } from your message:\n• ${labels.join("\n• ")}\n\nYou can edit any of them from the Live Summary panel before I generate the JD.`,
+      };
+      setMessages((prev) => [...prev, previewMsg]);
+      toast({
+        title: `Auto-filled ${labels.length} answer${labels.length === 1 ? "" : "s"}`,
+        description: "Review or edit them anytime from the Live Summary.",
+      });
+    }
   };
 
   const skip = () => {
@@ -292,12 +334,35 @@ const CreateJob = () => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: "" }));
   };
 
+  const updateAnswer = (qid: string, value: string | string[]) => {
+    setAnswers((prev) => ({ ...prev, [qid]: value }));
+    setAutoFilledIds((prev) => {
+      const next = new Set(prev);
+      next.delete(qid);
+      return next;
+    });
+    // If JD is already on screen, regenerate it
+    setMessages((prev) => {
+      const idx = [...prev].reverse().findIndex((m) => (m as any).kind === "jd");
+      if (idx === -1) return prev;
+      const realIdx = prev.length - 1 - idx;
+      const nextAnswers = { ...answers, [qid]: value };
+      const jd = buildJD(questions, nextAnswers);
+      const copy = [...prev];
+      copy[realIdx] = { ...copy[realIdx], text: jd } as ChatMessage;
+      return copy;
+    });
+    toast({ title: "Answer updated" });
+  };
+
   const restart = () => {
     setAnswers({});
     setMessages([]);
     setCompleted(false);
     setTextInput("");
     setMultiPick([]);
+    setAutoFilledIds(new Set());
+    setEditingId(null);
     setSelectedClientId("");
     setSelectedPocId("");
     setClientSubmitted(false);
