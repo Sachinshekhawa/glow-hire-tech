@@ -1154,4 +1154,157 @@ const AnswerInput = ({
   );
 };
 
+const EditAnswerDialog = ({
+  question,
+  currentValue,
+  onClose,
+  onSave,
+}: {
+  question: ChatQuestion | null;
+  currentValue: string | string[] | undefined;
+  onClose: () => void;
+  onSave: (qid: string, value: string | string[]) => void;
+}) => {
+  const [text, setText] = useState("");
+  const [multi, setMulti] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!question) return;
+    if (question.inputType === "multi_select") {
+      setMulti(Array.isArray(currentValue) ? currentValue : []);
+      setText("");
+    } else {
+      setText(typeof currentValue === "string" ? currentValue : "");
+      setMulti([]);
+    }
+  }, [question, currentValue]);
+
+  if (!question) return null;
+
+  const handleSave = () => {
+    if (question.inputType === "multi_select") {
+      onSave(question.id, multi);
+    } else {
+      onSave(question.id, text.trim());
+    }
+  };
+
+  const toggleMulti = (opt: string) =>
+    setMulti((prev) =>
+      prev.includes(opt) ? prev.filter((o) => o !== opt) : [...prev, opt],
+    );
+
+  return (
+    <Dialog open={!!question} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-primary" />
+            Edit answer
+          </DialogTitle>
+          <DialogDescription>{question.text}</DialogDescription>
+        </DialogHeader>
+
+        <div className="py-2">
+          {question.inputType === "single_select" ? (
+            <div className="flex flex-wrap gap-2">
+              {question.options.map((opt) => {
+                const active = text === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => setText(opt)}
+                    className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                      active
+                        ? "border-primary bg-primary/15 text-foreground"
+                        : "border-border bg-card hover:border-primary/60"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          ) : question.inputType === "multi_select" ? (
+            <>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {question.options.map((opt) => {
+                  const active = multi.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => toggleMulti(opt)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                        active
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border bg-card hover:border-primary/60"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={active}
+                        className="pointer-events-none h-3.5 w-3.5"
+                      />
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {multi.length} selected
+              </p>
+            </>
+          ) : (
+            <Textarea
+              autoFocus
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your answer…"
+              className="min-h-[96px]"
+            />
+          )}
+
+          {question.suggestedEnabled &&
+            question.inputType === "free_text" &&
+            question.options.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+                  Suggestions
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {question.options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setText(opt)}
+                      className="px-3 py-1 rounded-full border border-border bg-card text-xs text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="hero"
+            onClick={handleSave}
+            disabled={
+              question.inputType === "multi_select"
+                ? multi.length === 0 && question.required
+                : !text.trim() && question.required
+            }
+          >
+            <Sparkle className="h-4 w-4" />
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export default CreateJob;
