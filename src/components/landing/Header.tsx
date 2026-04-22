@@ -55,6 +55,9 @@ const Header = () => {
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
           <Button variant="ghost" size="sm" asChild>
+            <a href="/admin/system-behavior">Admin</a>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
             <a href="/signin">Sign in</a>
           </Button>
           <Button variant="hero" size="sm" asChild>
