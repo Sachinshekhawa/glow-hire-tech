@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   DndContext,
@@ -74,8 +74,8 @@ import {
   Condition,
   InputType,
   aiGenerateOptions,
-  seedQuestions,
 } from "@/data/chatQuestions";
+import { loadQuestions, saveQuestions } from "@/data/chatQuestionsStore";
 
 const MAX_WORDS = 50;
 const MAX_OPTIONS = 50;
@@ -111,9 +111,11 @@ const emptyDraft = (order: number): ChatQuestion => ({
 });
 
 const SystemBehavior = () => {
-  const [questions, setQuestions] = useState<ChatQuestion[]>(
-    [...seedQuestions].sort((a, b) => a.order - b.order),
-  );
+  const [questions, setQuestions] = useState<ChatQuestion[]>(() => loadQuestions());
+
+  useEffect(() => {
+    saveQuestions(questions);
+  }, [questions]);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
