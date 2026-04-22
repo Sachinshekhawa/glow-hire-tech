@@ -582,8 +582,9 @@ const CreateJob = () => {
                   const display = Array.isArray(a)
                     ? a.join(", ")
                     : (a as string) || "—";
+                  const wasAuto = autoFilledIds.has(q.id);
                   return (
-                    <li key={q.id} className="text-sm">
+                    <li key={q.id} className="text-sm group">
                       <div className="flex items-center gap-2">
                         <span
                           className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
@@ -594,9 +595,27 @@ const CreateJob = () => {
                         >
                           {answered ? <Check className="h-2.5 w-2.5" /> : "•"}
                         </span>
-                        <span className="text-muted-foreground line-clamp-1">
+                        <span className="text-muted-foreground line-clamp-1 flex-1">
                           {q.text}
                         </span>
+                        {wasAuto && (
+                          <Badge
+                            variant="secondary"
+                            className="gap-1 text-[9px] px-1.5 py-0 h-4 border border-primary/30 text-primary"
+                          >
+                            <Wand2 className="h-2.5 w-2.5" />
+                            auto
+                          </Badge>
+                        )}
+                        {answered && (
+                          <button
+                            onClick={() => setEditingId(q.id)}
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                            aria-label={`Edit answer for ${q.text}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                       {answered && (
                         <p className="ml-6 mt-1 text-foreground line-clamp-2">
