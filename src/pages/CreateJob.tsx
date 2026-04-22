@@ -158,6 +158,8 @@ const CreateJob = () => {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [selectedPocId, setSelectedPocId] = useState<string>("");
   const [clientSubmitted, setClientSubmitted] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [autoFilledIds, setAutoFilledIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const selectedClient = useMemo(
