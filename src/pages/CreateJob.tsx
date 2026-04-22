@@ -35,8 +35,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
-import { ClientField } from "@/data/clientFields";
-import { loadClientFields } from "@/data/clientFieldsStore";
+import { Client, POC } from "@/data/clients";
+import { loadClients } from "@/data/clientsStore";
 
 type ChatMessage =
   | { id: string; role: "assistant"; kind: "question"; questionId: string; text: string }
