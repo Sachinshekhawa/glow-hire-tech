@@ -667,6 +667,18 @@ const CreateJob = () => {
           />
         )}
       </main>
+
+      <EditAnswerDialog
+        question={
+          editingId ? questions.find((q) => q.id === editingId) || null : null
+        }
+        currentValue={editingId ? answers[editingId] : undefined}
+        onClose={() => setEditingId(null)}
+        onSave={(qid, value) => {
+          updateAnswer(qid, value);
+          setEditingId(null);
+        }}
+      />
     </div>
   );
 };
