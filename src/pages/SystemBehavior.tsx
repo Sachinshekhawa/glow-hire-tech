@@ -76,7 +76,7 @@ import {
   aiGenerateOptions,
 } from "@/data/chatQuestions";
 import { loadQuestions, saveQuestions } from "@/data/chatQuestionsStore";
-import { SectionSwitcher } from "./ClientFieldsAdmin";
+import { SectionSwitcher } from "./ClientFieldsAdmin.shared";
 
 const MAX_WORDS = 50;
 const MAX_OPTIONS = 50;

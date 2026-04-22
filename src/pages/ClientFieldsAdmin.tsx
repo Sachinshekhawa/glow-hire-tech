@@ -1,41 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   ArrowLeft,
   Building2,
-  GripVertical,
-  ListChecks,
+  ChevronDown,
+  ChevronRight,
+  Mail,
+  MapPin,
   Pencil,
+  Phone,
   Plus,
   Search,
   Sparkles,
   Trash2,
   UserRound,
-  X,
+  Globe,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -64,178 +49,214 @@ import {
 } from "@/components/ui/select";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "@/components/ui/use-toast";
-import {
-  ClientField,
-  ClientFieldType,
-  fieldTypeLabel,
-  groupLabel,
-} from "@/data/clientFields";
-import {
-  loadClientFields,
-  saveClientFields,
-} from "@/data/clientFieldsStore";
+
+import { Client, POC, industryOptions } from "@/data/clients";
+import { loadClients, saveClients } from "@/data/clientsStore";
+import { SectionSwitcher } from "./ClientFieldsAdmin.shared";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-type EditorState = {
-  open: boolean;
-  mode: "create" | "edit";
-  draft: ClientField;
-};
+type ClientDraft = Client;
+type POCDraft = POC & { clientId: string };
 
-const emptyDraft = (order: number, group: ClientField["group"]): ClientField => ({
-  id: `cf-${uid()}`,
-  label: "",
-  placeholder: "",
-  type: "text",
-  group,
-  active: true,
-  required: false,
-  options: [],
-  order,
+const emptyClient = (): ClientDraft => ({
+  id: `cl-${uid()}`,
+  name: "",
+  industry: "",
+  website: "",
+  location: "",
+  pocs: [],
 });
 
-type FilterStatus = "all" | "active" | "inactive";
+const emptyPoc = (clientId: string): POCDraft => ({
+  clientId,
+  id: `poc-${uid()}`,
+  name: "",
+  designation: "",
+  email: "",
+  phone: "",
+  notes: "",
+});
 
 const ClientFieldsAdmin = () => {
-  const [fields, setFields] = useState<ClientField[]>(() => loadClientFields());
+  const [clients, setClients] = useState<Client[]>(() => loadClients());
 
   useEffect(() => {
-    saveClientFields(fields);
-  }, [fields]);
+    saveClients(clients);
+  }, [clients]);
 
-  const [filter, setFilter] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
-  const [editor, setEditor] = useState<EditorState>({
-    open: false,
-    mode: "create",
-    draft: emptyDraft(0, "client"),
-  });
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const [clientEditor, setClientEditor] = useState<{
+    open: boolean;
+    mode: "create" | "edit";
+    draft: ClientDraft;
+  }>({ open: false, mode: "create", draft: emptyClient() });
+
+  const [pocEditor, setPocEditor] = useState<{
+    open: boolean;
+    mode: "create" | "edit";
+    draft: POCDraft;
+  }>({ open: false, mode: "create", draft: emptyPoc("") });
+
   const [confirmDelete, setConfirmDelete] = useState<{
     open: boolean;
-    id: string | null;
-  }>({ open: false, id: null });
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+    kind: "client" | "poc" | null;
+    clientId: string | null;
+    pocId: string | null;
+  }>({ open: false, kind: null, clientId: null, pocId: null });
 
   const filtered = useMemo(() => {
-    return fields
-      .filter((f) =>
-        filter === "all" ? true : filter === "active" ? f.active : !f.active,
-      )
-      .filter((f) =>
-        search.trim()
-          ? f.label.toLowerCase().includes(search.toLowerCase())
-          : true,
-      );
-  }, [fields, filter, search]);
+    const q = search.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.industry?.toLowerCase().includes(q) ||
+        c.pocs.some(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.email.toLowerCase().includes(q),
+        ),
+    );
+  }, [clients, search]);
 
-  const clientFields = filtered.filter((f) => f.group === "client");
-  const pocFields = filtered.filter((f) => f.group === "poc");
+  const totalPocs = clients.reduce((acc, c) => acc + c.pocs.length, 0);
 
-  const openCreate = (group: ClientField["group"]) => {
-    setEditor({
-      open: true,
-      mode: "create",
-      draft: emptyDraft(fields.length, group),
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-  };
 
-  const openEdit = (f: ClientField) => {
-    setEditor({
+  /* -------- Client CRUD -------- */
+  const openCreateClient = () =>
+    setClientEditor({ open: true, mode: "create", draft: emptyClient() });
+
+  const openEditClient = (c: Client) =>
+    setClientEditor({
       open: true,
       mode: "edit",
-      draft: JSON.parse(JSON.stringify(f)),
+      draft: JSON.parse(JSON.stringify(c)),
     });
-  };
 
-  const closeEditor = () => setEditor((s) => ({ ...s, open: false }));
-
-  const updateDraft = (patch: Partial<ClientField>) =>
-    setEditor((s) => ({ ...s, draft: { ...s.draft, ...patch } }));
-
-  const saveDraft = () => {
-    const draft = editor.draft;
-    if (!draft.label.trim()) {
-      toast({ title: "Field label is required", variant: "destructive" });
+  const saveClient = () => {
+    const d = clientEditor.draft;
+    if (!d.name.trim()) {
+      toast({ title: "Client name is required", variant: "destructive" });
       return;
     }
-    const dup = fields.some(
-      (f) =>
-        f.id !== draft.id &&
-        f.label.trim().toLowerCase() === draft.label.trim().toLowerCase(),
+    const dup = clients.some(
+      (c) =>
+        c.id !== d.id &&
+        c.name.trim().toLowerCase() === d.name.trim().toLowerCase(),
     );
     if (dup) {
-      toast({
-        title: "A field with this label already exists",
-        variant: "destructive",
-      });
+      toast({ title: "A client with this name already exists", variant: "destructive" });
       return;
     }
-    if (draft.type === "single_select" && draft.options.length === 0) {
-      toast({
-        title: "Add at least one option for single select",
-        variant: "destructive",
-      });
-      return;
-    }
-    const cleaned: ClientField = {
-      ...draft,
-      label: draft.label.trim(),
-      placeholder: draft.placeholder?.trim() || "",
-      options: Array.from(
-        new Set(draft.options.map((o) => o.trim()).filter(Boolean)),
-      ),
-    };
-    setFields((prev) => {
-      if (editor.mode === "create") {
-        return [...prev, { ...cleaned, order: prev.length }];
-      }
-      return prev.map((f) => (f.id === cleaned.id ? cleaned : f));
+    setClients((prev) => {
+      if (clientEditor.mode === "create") return [...prev, { ...d, name: d.name.trim() }];
+      return prev.map((c) => (c.id === d.id ? { ...d, name: d.name.trim() } : c));
     });
-    toast({
-      title: editor.mode === "create" ? "Field added" : "Field updated",
-    });
-    closeEditor();
+    toast({ title: clientEditor.mode === "create" ? "Client added" : "Client updated" });
+    setClientEditor((s) => ({ ...s, open: false }));
   };
 
-  const requestDelete = (id: string) =>
-    setConfirmDelete({ open: true, id });
+  const deleteClient = (id: string) =>
+    setConfirmDelete({ open: true, kind: "client", clientId: id, pocId: null });
+
+  /* -------- POC CRUD -------- */
+  const openCreatePoc = (clientId: string) =>
+    setPocEditor({ open: true, mode: "create", draft: emptyPoc(clientId) });
+
+  const openEditPoc = (clientId: string, p: POC) =>
+    setPocEditor({
+      open: true,
+      mode: "edit",
+      draft: { ...JSON.parse(JSON.stringify(p)), clientId },
+    });
+
+  const savePoc = () => {
+    const d = pocEditor.draft;
+    if (!d.name.trim()) {
+      toast({ title: "POC name is required", variant: "destructive" });
+      return;
+    }
+    if (!d.email.trim()) {
+      toast({ title: "POC email is required", variant: "destructive" });
+      return;
+    }
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id !== d.clientId) return c;
+        if (pocEditor.mode === "create") {
+          return {
+            ...c,
+            pocs: [
+              ...c.pocs,
+              {
+                id: d.id,
+                name: d.name.trim(),
+                designation: d.designation?.trim() || "",
+                email: d.email.trim(),
+                phone: d.phone?.trim() || "",
+                notes: d.notes?.trim() || "",
+              },
+            ],
+          };
+        }
+        return {
+          ...c,
+          pocs: c.pocs.map((p) =>
+            p.id === d.id
+              ? {
+                  id: d.id,
+                  name: d.name.trim(),
+                  designation: d.designation?.trim() || "",
+                  email: d.email.trim(),
+                  phone: d.phone?.trim() || "",
+                  notes: d.notes?.trim() || "",
+                }
+              : p,
+          ),
+        };
+      }),
+    );
+    setExpanded((prev) => new Set(prev).add(d.clientId));
+    toast({ title: pocEditor.mode === "create" ? "POC added" : "POC updated" });
+    setPocEditor((s) => ({ ...s, open: false }));
+  };
+
+  const deletePoc = (clientId: string, pocId: string) =>
+    setConfirmDelete({ open: true, kind: "poc", clientId, pocId });
 
   const performDelete = () => {
-    if (!confirmDelete.id) return;
-    setFields((prev) =>
-      prev
-        .filter((f) => f.id !== confirmDelete.id)
-        .map((f, i) => ({ ...f, order: i })),
-    );
-    toast({ title: "Field deleted" });
-    setConfirmDelete({ open: false, id: null });
-  };
-
-  const toggleActive = (id: string) => {
-    setFields((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, active: !f.active } : f)),
-    );
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setFields((prev) => {
-      const oldIndex = prev.findIndex((f) => f.id === active.id);
-      const newIndex = prev.findIndex((f) => f.id === over.id);
-      const moved = arrayMove(prev, oldIndex, newIndex);
-      return moved.map((f, i) => ({ ...f, order: i }));
-    });
+    if (confirmDelete.kind === "client" && confirmDelete.clientId) {
+      setClients((prev) => prev.filter((c) => c.id !== confirmDelete.clientId));
+      toast({ title: "Client deleted" });
+    } else if (
+      confirmDelete.kind === "poc" &&
+      confirmDelete.clientId &&
+      confirmDelete.pocId
+    ) {
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === confirmDelete.clientId
+            ? { ...c, pocs: c.pocs.filter((p) => p.id !== confirmDelete.pocId) }
+            : c,
+        ),
+      );
+      toast({ title: "POC deleted" });
+    }
+    setConfirmDelete({ open: false, kind: null, clientId: null, pocId: null });
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -271,129 +292,316 @@ const ClientFieldsAdmin = () => {
       </header>
 
       <main className="container py-8 md:py-12">
-        {/* Section switcher */}
         <SectionSwitcher current="client" />
 
-        {/* Heading */}
         <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               <Building2 className="h-3.5 w-3.5" />
-              Post-JD capture
+              Directory
             </div>
             <h1 className="mt-2 font-display text-3xl md:text-4xl font-bold tracking-tight">
-              Manage <span className="gradient-text">client &amp; POC fields</span>
+              Manage <span className="gradient-text">clients &amp; POCs</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              These fields are collected after the job description is generated.
-              They are stored with the job record but never appear inside the
-              public JD.
+              Maintain your master directory of client companies and their
+              points of contact. Recruiters select from this list when creating
+              a job — no duplicate entry needed.
             </p>
           </div>
+          <Button variant="hero" onClick={openCreateClient}>
+            <Plus className="h-4 w-4" /> Add client
+          </Button>
         </div>
 
-        {/* Stats */}
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total fields" value={fields.length} />
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-3 gap-3">
+          <StatCard label="Total clients" value={clients.length} accent />
+          <StatCard label="Total POCs" value={totalPocs} />
           <StatCard
-            label="Active"
-            value={fields.filter((f) => f.active).length}
-            accent
-          />
-          <StatCard
-            label="Client fields"
-            value={fields.filter((f) => f.group === "client").length}
-          />
-          <StatCard
-            label="POC fields"
-            value={fields.filter((f) => f.group === "poc").length}
+            label="Avg POCs / client"
+            value={
+              clients.length === 0
+                ? 0
+                : Math.round((totalPocs / clients.length) * 10) / 10
+            }
           />
         </div>
 
-        {/* Toolbar */}
-        <div className="mt-8 glass-card rounded-2xl p-3 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <div className="relative flex-1 max-w-md">
+        <div className="mt-8 glass-card rounded-2xl p-3">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search fields..."
+              placeholder="Search clients, POCs, or emails..."
               className="pl-9 bg-secondary/60 border-0 focus-visible:ring-1"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              Filter:
-            </span>
-            {(["all", "active", "inactive"] as FilterStatus[]).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-                  filter === f
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Two groups */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <GroupSection
-            title="Client details"
-            description="Information about the company hiring for this role."
-            icon={<Building2 className="h-4 w-4" />}
-            fields={clientFields}
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            onEdit={openEdit}
-            onDelete={requestDelete}
-            onToggleActive={toggleActive}
-            onAdd={() => openCreate("client")}
-          />
-          <GroupSection
-            title="Point of Contact"
-            description="Who the recruiter or talent team should reach out to."
-            icon={<UserRound className="h-4 w-4" />}
-            fields={pocFields}
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            onEdit={openEdit}
-            onDelete={requestDelete}
-            onToggleActive={toggleActive}
-            onAdd={() => openCreate("poc")}
-          />
+        <div className="mt-6 space-y-3">
+          {filtered.length === 0 ? (
+            <div className="glass-card rounded-2xl p-10 text-center">
+              <Building2 className="mx-auto h-8 w-8 text-muted-foreground" />
+              <p className="mt-3 text-sm text-muted-foreground">
+                {clients.length === 0
+                  ? "No clients yet — add your first one to get started."
+                  : "No results match your search."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((c) => (
+              <ClientCard
+                key={c.id}
+                client={c}
+                expanded={expanded.has(c.id)}
+                onToggle={() => toggleExpand(c.id)}
+                onEdit={() => openEditClient(c)}
+                onDelete={() => deleteClient(c.id)}
+                onAddPoc={() => openCreatePoc(c.id)}
+                onEditPoc={(p) => openEditPoc(c.id, p)}
+                onDeletePoc={(p) => deletePoc(c.id, p.id)}
+              />
+            ))
+          )}
         </div>
-
-        <p className="mt-10 text-center text-xs text-muted-foreground">
-          Field changes apply to new jobs only. Saved client/POC details on
-          existing jobs are preserved.
-        </p>
       </main>
 
-      {/* Editor */}
-      <FieldEditor
-        state={editor}
-        onClose={closeEditor}
-        onSave={saveDraft}
-        onChange={updateDraft}
-      />
+      {/* Client editor */}
+      <Dialog
+        open={clientEditor.open}
+        onOpenChange={(o) => setClientEditor((s) => ({ ...s, open: o }))}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {clientEditor.mode === "create" ? "Add client" : "Edit client"}
+            </DialogTitle>
+            <DialogDescription>
+              Company-level details. POCs are managed separately under each
+              client.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="cl-name">
+                Client / Company name
+                <span className="text-destructive ml-0.5">*</span>
+              </Label>
+              <Input
+                id="cl-name"
+                value={clientEditor.draft.name}
+                onChange={(e) =>
+                  setClientEditor((s) => ({
+                    ...s,
+                    draft: { ...s.draft, name: e.target.value },
+                  }))
+                }
+                placeholder="e.g. Acme Inc."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Industry</Label>
+                <Select
+                  value={clientEditor.draft.industry || ""}
+                  onValueChange={(v) =>
+                    setClientEditor((s) => ({
+                      ...s,
+                      draft: { ...s.draft, industry: v },
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industryOptions.map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cl-loc">Location</Label>
+                <Input
+                  id="cl-loc"
+                  value={clientEditor.draft.location || ""}
+                  onChange={(e) =>
+                    setClientEditor((s) => ({
+                      ...s,
+                      draft: { ...s.draft, location: e.target.value },
+                    }))
+                  }
+                  placeholder="e.g. New York, NY"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cl-web">Website</Label>
+              <Input
+                id="cl-web"
+                type="url"
+                value={clientEditor.draft.website || ""}
+                onChange={(e) =>
+                  setClientEditor((s) => ({
+                    ...s,
+                    draft: { ...s.draft, website: e.target.value },
+                  }))
+                }
+                placeholder="https://acme.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setClientEditor((s) => ({ ...s, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button variant="hero" onClick={saveClient}>
+              {clientEditor.mode === "create" ? "Add client" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete confirm */}
+      {/* POC editor */}
+      <Dialog
+        open={pocEditor.open}
+        onOpenChange={(o) => setPocEditor((s) => ({ ...s, open: o }))}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {pocEditor.mode === "create"
+                ? "Add point of contact"
+                : "Edit point of contact"}
+            </DialogTitle>
+            <DialogDescription>
+              Contact details for this client. Recruiters will choose this
+              person when assigning a job.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="poc-name">
+                  Full name
+                  <span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <Input
+                  id="poc-name"
+                  value={pocEditor.draft.name}
+                  onChange={(e) =>
+                    setPocEditor((s) => ({
+                      ...s,
+                      draft: { ...s.draft, name: e.target.value },
+                    }))
+                  }
+                  placeholder="e.g. Sarah Johnson"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="poc-desig">Designation</Label>
+                <Input
+                  id="poc-desig"
+                  value={pocEditor.draft.designation || ""}
+                  onChange={(e) =>
+                    setPocEditor((s) => ({
+                      ...s,
+                      draft: { ...s.draft, designation: e.target.value },
+                    }))
+                  }
+                  placeholder="e.g. Talent Acquisition Lead"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="poc-email">
+                  Email
+                  <span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <Input
+                  id="poc-email"
+                  type="email"
+                  value={pocEditor.draft.email}
+                  onChange={(e) =>
+                    setPocEditor((s) => ({
+                      ...s,
+                      draft: { ...s.draft, email: e.target.value },
+                    }))
+                  }
+                  placeholder="name@company.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="poc-phone">Phone</Label>
+                <Input
+                  id="poc-phone"
+                  type="tel"
+                  value={pocEditor.draft.phone || ""}
+                  onChange={(e) =>
+                    setPocEditor((s) => ({
+                      ...s,
+                      draft: { ...s.draft, phone: e.target.value },
+                    }))
+                  }
+                  placeholder="+1 555 123 4567"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="poc-notes">Internal notes</Label>
+              <Textarea
+                id="poc-notes"
+                value={pocEditor.draft.notes || ""}
+                onChange={(e) =>
+                  setPocEditor((s) => ({
+                    ...s,
+                    draft: { ...s.draft, notes: e.target.value },
+                  }))
+                }
+                placeholder="Preferred channel, timezone, etc."
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setPocEditor((s) => ({ ...s, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button variant="hero" onClick={savePoc}>
+              {pocEditor.mode === "create" ? "Add POC" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={confirmDelete.open}
-        onOpenChange={(o) => setConfirmDelete((s) => ({ ...s, open: o }))}
+        onOpenChange={(o) =>
+          setConfirmDelete((s) => ({ ...s, open: o }))
+        }
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete field?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirmDelete.kind === "client"
+                ? "Delete client?"
+                : "Delete POC?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This field will no longer appear in the post-JD capture form.
-              Existing jobs keep any data already collected.
+              {confirmDelete.kind === "client"
+                ? "This will remove the client and all of its POCs from the directory."
+                : "This will remove the POC from this client."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -410,38 +618,6 @@ const ClientFieldsAdmin = () => {
     </div>
   );
 };
-
-/* ---------- Shared switcher (also used by SystemBehavior) ---------- */
-export const SectionSwitcher = ({
-  current,
-}: {
-  current: "questions" | "client";
-}) => (
-  <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-secondary/40 p-1">
-    <Link
-      to="/admin/system-behavior"
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-        current === "questions"
-          ? "bg-background text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      <ListChecks className="h-3.5 w-3.5" />
-      Chat questions
-    </Link>
-    <Link
-      to="/admin/client-fields"
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-        current === "client"
-          ? "bg-background text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      <Building2 className="h-3.5 w-3.5" />
-      Client &amp; POC fields
-    </Link>
-  </div>
-);
 
 /* ---------- Sub-components ---------- */
 
@@ -466,373 +642,168 @@ const StatCard = ({
   </div>
 );
 
-const GroupSection = ({
-  title,
-  description,
-  icon,
-  fields,
-  sensors,
-  onDragEnd,
+const ClientCard = ({
+  client,
+  expanded,
+  onToggle,
   onEdit,
   onDelete,
-  onToggleActive,
-  onAdd,
+  onAddPoc,
+  onEditPoc,
+  onDeletePoc,
 }: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  fields: ClientField[];
-  sensors: ReturnType<typeof useSensors>;
-  onDragEnd: (e: DragEndEvent) => void;
-  onEdit: (f: ClientField) => void;
-  onDelete: (id: string) => void;
-  onToggleActive: (id: string) => void;
-  onAdd: () => void;
-}) => (
-  <section className="glass-card rounded-2xl p-4">
-    <header className="flex items-center justify-between gap-3 px-1 pb-3">
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </span>
-        <div>
-          <h2 className="font-display text-base font-semibold">{title}</h2>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      <Button variant="hero" size="sm" onClick={onAdd}>
-        <Plus className="h-4 w-4" /> Add field
-      </Button>
-    </header>
-
-    {fields.length === 0 ? (
-      <div className="rounded-xl border border-dashed border-border py-10 text-center">
-        <p className="text-sm text-muted-foreground">No fields yet.</p>
-      </div>
-    ) : (
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={onDragEnd}
-      >
-        <SortableContext
-          items={fields.map((f) => f.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <ul className="space-y-2">
-            {fields.map((f, i) => (
-              <SortableFieldRow
-                key={f.id}
-                field={f}
-                index={i}
-                onEdit={() => onEdit(f)}
-                onDelete={() => onDelete(f.id)}
-                onToggleActive={() => onToggleActive(f.id)}
-              />
-            ))}
-          </ul>
-        </SortableContext>
-      </DndContext>
-    )}
-  </section>
-);
-
-const SortableFieldRow = ({
-  field,
-  index,
-  onEdit,
-  onDelete,
-  onToggleActive,
-}: {
-  field: ClientField;
-  index: number;
+  client: Client;
+  expanded: boolean;
+  onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onToggleActive: () => void;
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: field.id });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 20 : "auto",
-  };
-
-  return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={`group flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors ${
-        isDragging ? "shadow-elegant" : ""
-      }`}
-    >
+  onAddPoc: () => void;
+  onEditPoc: (p: POC) => void;
+  onDeletePoc: (p: POC) => void;
+}) => (
+  <div className="glass-card rounded-2xl overflow-hidden">
+    <div className="flex items-center gap-3 p-4">
       <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
-        aria-label="Drag to reorder"
+        onClick={onToggle}
+        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+        aria-label={expanded ? "Collapse" : "Expand"}
       >
-        <GripVertical className="h-4 w-4" />
+        {expanded ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
       </button>
-      <span className="inline-flex items-center justify-center min-w-7 h-6 px-1.5 rounded-md bg-secondary text-xs font-mono text-muted-foreground">
-        {String(index + 1).padStart(2, "0")}
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Building2 className="h-5 w-5" />
       </span>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-medium truncate">{field.label}</p>
-          <Badge variant="secondary" className="text-[10px]">
-            {fieldTypeLabel[field.type]}
-          </Badge>
-          {field.required && (
-            <Badge variant="outline" className="text-[10px]">
-              Required
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-display text-base font-semibold truncate">
+            {client.name}
+          </h3>
+          {client.industry && (
+            <Badge variant="secondary" className="text-[10px]">
+              {client.industry}
             </Badge>
           )}
+          <Badge variant="outline" className="text-[10px] gap-1">
+            <UserRound className="h-3 w-3" />
+            {client.pocs.length} POC{client.pocs.length === 1 ? "" : "s"}
+          </Badge>
         </div>
-        {field.placeholder && (
-          <p className="text-xs text-muted-foreground truncate">
-            {field.placeholder}
-          </p>
-        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {client.location && (
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {client.location}
+            </span>
+          )}
+          {client.website && (
+            <a
+              href={client.website}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 hover:text-primary"
+            >
+              <Globe className="h-3 w-3" />
+              {client.website.replace(/^https?:\/\//, "")}
+            </a>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-1">
-        <button
-          onClick={onToggleActive}
-          className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-            field.active
-              ? "bg-primary/10 text-primary hover:bg-primary/15"
-              : "bg-muted text-muted-foreground hover:bg-secondary"
-          }`}
-        >
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              field.active ? "bg-primary" : "bg-muted-foreground"
-            }`}
-          />
-          {field.active ? "Active" : "Inactive"}
-        </button>
-        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit">
-          <Pencil className="h-4 w-4" />
+        <Button variant="ghost" size="sm" onClick={onEdit}>
+          <Pencil className="h-3.5 w-3.5" /> Edit
         </Button>
         <Button
           variant="ghost"
-          size="icon"
+          size="sm"
           onClick={onDelete}
-          aria-label="Delete"
-          className="text-muted-foreground hover:text-destructive"
+          className="text-destructive hover:text-destructive"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
-    </li>
-  );
-};
+    </div>
 
-const FieldEditor = ({
-  state,
-  onClose,
-  onSave,
-  onChange,
-}: {
-  state: EditorState;
-  onClose: () => void;
-  onSave: () => void;
-  onChange: (patch: Partial<ClientField>) => void;
-}) => {
-  const { draft } = state;
-  const [newOption, setNewOption] = useState("");
-
-  const addOption = (val: string) => {
-    const v = val.trim();
-    if (!v) return;
-    if (draft.options.some((o) => o.toLowerCase() === v.toLowerCase())) {
-      toast({ title: "Duplicate option", variant: "destructive" });
-      return;
-    }
-    onChange({ options: [...draft.options, v] });
-    setNewOption("");
-  };
-
-  const removeOption = (idx: number) =>
-    onChange({ options: draft.options.filter((_, i) => i !== idx) });
-
-  return (
-    <Dialog open={state.open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">
-            {state.mode === "create" ? "Add field" : "Edit field"}
-          </DialogTitle>
-          <DialogDescription>
-            Configure how this {groupLabel[draft.group].toLowerCase()} field is
-            collected after the JD is generated.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-5 pt-2">
-          <div className="space-y-2">
-            <Label>Label</Label>
-            <Input
-              value={draft.label}
-              onChange={(e) => onChange({ label: e.target.value })}
-              placeholder="e.g. POC email"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Placeholder</Label>
-            <Input
-              value={draft.placeholder ?? ""}
-              onChange={(e) => onChange({ placeholder: e.target.value })}
-              placeholder="Hint text shown inside the input"
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Group</Label>
-              <Select
-                value={draft.group}
-                onValueChange={(v) =>
-                  onChange({ group: v as ClientField["group"] })
-                }
+    {expanded && (
+      <div className="border-t border-border/60 bg-secondary/30 px-4 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Points of Contact
+          </h4>
+          <Button variant="outline" size="sm" onClick={onAddPoc}>
+            <Plus className="h-3.5 w-3.5" /> Add POC
+          </Button>
+        </div>
+        {client.pocs.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-3 text-center">
+            No POCs yet for this client.
+          </p>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {client.pocs.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-xl border border-border/60 bg-background/60 p-3"
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="client">Client</SelectItem>
-                  <SelectItem value="poc">POC</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select
-                value={draft.type}
-                onValueChange={(v) =>
-                  onChange({ type: v as ClientFieldType })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="url">URL</SelectItem>
-                  <SelectItem value="textarea">Long text</SelectItem>
-                  <SelectItem value="single_select">Single select</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <ToggleRow
-              label="Required"
-              description="Recruiter must fill before saving."
-              checked={draft.required}
-              onChange={(v) => onChange({ required: v })}
-            />
-            <ToggleRow
-              label="Active"
-              description="Show in capture form."
-              checked={draft.active}
-              onChange={(v) => onChange({ active: v })}
-            />
-          </div>
-
-          {draft.type === "single_select" && (
-            <div className="space-y-2">
-              <Label>Options</Label>
-              <div className="space-y-2">
-                {draft.options.map((opt, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 rounded-lg bg-secondary/40 px-2 py-1"
-                  >
-                    <span className="text-xs font-mono text-muted-foreground w-6 text-center">
-                      {idx + 1}
-                    </span>
-                    <span className="flex-1 text-sm">{opt}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <UserRound className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-sm font-medium truncate">{p.name}</p>
+                    </div>
+                    {p.designation && (
+                      <p className="mt-0.5 ml-8 text-xs text-muted-foreground truncate">
+                        {p.designation}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-0.5">
                     <Button
-                      type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeOption(idx)}
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => onEditPoc(p)}
                     >
-                      <X className="h-4 w-4" />
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      onClick={() => onDeletePoc(p)}
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
-                ))}
+                </div>
+                <div className="mt-2 ml-8 space-y-1 text-xs text-muted-foreground">
+                  <div className="inline-flex items-center gap-1.5">
+                    <Mail className="h-3 w-3" />
+                    <span className="truncate">{p.email}</span>
+                  </div>
+                  {p.phone && (
+                    <div className="inline-flex items-center gap-1.5 ml-3">
+                      <Phone className="h-3 w-3" />
+                      {p.phone}
+                    </div>
+                  )}
+                </div>
+                {p.notes && (
+                  <p className="mt-2 ml-8 text-[11px] italic text-muted-foreground line-clamp-2">
+                    {p.notes}
+                  </p>
+                )}
               </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newOption}
-                  onChange={(e) => setNewOption(e.target.value)}
-                  placeholder="Add option and press Enter"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addOption(newOption);
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addOption(newOption)}
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="mt-6">
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="hero" onClick={onSave}>
-            Save field
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-const ToggleRow = ({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) => (
-  <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-background/60 px-3 py-2">
-    <div className="min-w-0">
-      <div className="text-sm font-medium">{label}</div>
-      {description && (
-        <div className="text-xs text-muted-foreground">{description}</div>
-      )}
-    </div>
-    <Switch checked={checked} onCheckedChange={onChange} />
+            ))}
+          </div>
+        )}
+      </div>
+    )}
   </div>
 );
 
