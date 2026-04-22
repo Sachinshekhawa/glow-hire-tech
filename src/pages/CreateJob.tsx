@@ -7,12 +7,15 @@ import {
   Check,
   Copy,
   Download,
+  Pencil,
   RefreshCw,
   Send,
   Settings2,
   Sparkles,
+  Sparkle,
   User,
   UserRound,
+  Wand2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +26,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -35,6 +46,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
+import { extractAnswersFromText } from "@/data/answerExtractor";
 import { Client, POC } from "@/data/clients";
 import { loadClients } from "@/data/clientsStore";
 
