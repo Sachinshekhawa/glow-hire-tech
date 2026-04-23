@@ -45,7 +45,7 @@ const SignIn = () => {
         title: "Welcome back 👋",
         description: "Signed in successfully (demo mode).",
       });
-      navigate("/");
+      navigate("/dashboard");
     }, 900);
   };
 
