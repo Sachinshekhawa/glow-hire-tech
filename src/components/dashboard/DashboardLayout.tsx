@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import ThemeToggle from "@/components/ThemeToggle";
+import DashboardSwitcher from "@/components/dashboard/DashboardSwitcher";
 import { recruiter } from "@/data/dashboardMock";
 import { cn } from "@/lib/utils";
 
@@ -115,6 +116,8 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
           </div>
 
           <div className="flex-1 md:hidden" />
+
+          <DashboardSwitcher />
 
           <Button asChild variant="hero" size="sm" className="hidden sm:inline-flex">
             <Link to="/create-job">

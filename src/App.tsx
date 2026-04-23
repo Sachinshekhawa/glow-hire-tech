@@ -9,6 +9,7 @@ import BlogIndex from "./pages/Blog.tsx";
 import BlogPost from "./pages/BlogPost.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
+import ManagerDashboard from "./pages/ManagerDashboard.tsx";
 import SystemBehavior from "./pages/SystemBehavior.tsx";
 import ClientFieldsAdmin from "./pages/ClientFieldsAdmin.tsx";
 import CreateJob from "./pages/CreateJob.tsx";
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/manager" element={<ManagerDashboard />} />
             <Route path="/admin/system-behavior" element={<SystemBehavior />} />
             <Route path="/admin/client-fields" element={<ClientFieldsAdmin />} />
             <Route path="/create-job" element={<CreateJob />} />
