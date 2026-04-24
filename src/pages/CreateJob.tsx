@@ -49,16 +49,39 @@ import { loadQuestions } from "@/data/chatQuestionsStore";
 import { extractAnswersFromText } from "@/data/answerExtractor";
 import { Client, POC } from "@/data/clients";
 import { loadClients } from "@/data/clientsStore";
+import {
+  ClientCondition,
+  ClientQuestion,
+} from "@/data/clientQuestions";
+import { loadClientQuestions } from "@/data/clientQuestionsStore";
+
+type Phase = "job" | "client";
 
 type ChatMessage =
-  | { id: string; role: "assistant"; kind: "question"; questionId: string; text: string }
+  | {
+      id: string;
+      role: "assistant";
+      kind: "question";
+      phase: Phase;
+      questionId: string;
+      text: string;
+    }
   | { id: string; role: "assistant"; kind: "info"; text: string }
   | { id: string; role: "assistant"; kind: "jd"; text: string }
-  | { id: string; role: "user"; text: string; questionId: string };
+  | {
+      id: string;
+      role: "user";
+      phase: Phase;
+      text: string;
+      questionId: string;
+    };
 
 type Answers = Record<string, string | string[]>;
 
-const conditionPasses = (cond: Condition, answers: Answers): boolean => {
+const conditionPasses = (
+  cond: Condition | ClientCondition,
+  answers: Answers,
+): boolean => {
   const ans = answers[cond.ifQuestionId];
   if (ans == null) return false;
   if (Array.isArray(ans)) {
@@ -71,12 +94,16 @@ const conditionPasses = (cond: Condition, answers: Answers): boolean => {
     : ans.toLowerCase() === cond.value.toLowerCase();
 };
 
-/**
- * A question is shown if:
- *  - active = true, AND
- *  - has no conditions OR at least one condition passes against current answers
- */
-const isQuestionEligible = (q: ChatQuestion, answers: Answers): boolean => {
+const isJobQuestionEligible = (q: ChatQuestion, answers: Answers): boolean => {
+  if (!q.active) return false;
+  if (!q.conditions || q.conditions.length === 0) return true;
+  return q.conditions.some((c) => conditionPasses(c, answers));
+};
+
+const isClientQuestionEligible = (
+  q: ClientQuestion,
+  answers: Answers,
+): boolean => {
   if (!q.active) return false;
   if (!q.conditions || q.conditions.length === 0) return true;
   return q.conditions.some((c) => conditionPasses(c, answers));
@@ -114,7 +141,6 @@ const buildJD = (questions: ChatQuestion[], answers: Answers): string => {
     skills.forEach((s) => lines.push(`- ${s}`));
   }
 
-  // Append any additional answered questions not covered above
   const handled = new Set(["q-1", "q-2", "q-4", "q-5", "q-6", "q-7", "q-8"]);
   const extras = questions.filter(
     (q) => !handled.has(q.id) && answers[q.id] != null,
@@ -146,55 +172,92 @@ const buildJD = (questions: ChatQuestion[], answers: Answers): string => {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const formatAnswerForDisplay = (
+  q: ClientQuestion,
+  value: string | string[],
+  clients: Client[],
+): string => {
+  if (Array.isArray(value)) return value.join(", ");
+  if (q.inputType === "client_picker") {
+    const c = clients.find((c) => c.id === value);
+    return c ? c.name : value;
+  }
+  if (q.inputType === "poc_picker") {
+    for (const c of clients) {
+      const p = c.pocs.find((p) => p.id === value);
+      if (p) return `${p.name}${p.designation ? ` · ${p.designation}` : ""}`;
+    }
+    return value;
+  }
+  if (q.inputType === "currency" && value) {
+    return value.startsWith("$") ? value : `$${value}`;
+  }
+  return value || "(skipped)";
+};
+
 const CreateJob = () => {
   const { toast } = useToast();
   const [questions] = useState<ChatQuestion[]>(() => loadQuestions());
+  const [clientQuestions] = useState<ClientQuestion[]>(() =>
+    loadClientQuestions(),
+  );
   const [clients] = useState<Client[]>(() => loadClients());
   const [answers, setAnswers] = useState<Answers>({});
+  const [clientAnswers, setClientAnswers] = useState<Answers>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState("");
   const [multiPick, setMultiPick] = useState<string[]>([]);
-  const [completed, setCompleted] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [selectedPocId, setSelectedPocId] = useState<string>("");
-  const [clientSubmitted, setClientSubmitted] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>("job");
+  const [completed, setCompleted] = useState(false); // both phases done
+  const [editingId, setEditingId] = useState<string | null>(null); // job-question edit
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [autoFilledIds, setAutoFilledIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const selectedClient = useMemo(
-    () => clients.find((c) => c.id === selectedClientId) || null,
-    [clients, selectedClientId],
-  );
-  const selectedPoc = useMemo(
-    () => selectedClient?.pocs.find((p) => p.id === selectedPocId) || null,
-    [selectedClient, selectedPocId],
-  );
-
-  // Eligible question pipeline based on current answers
+  // Eligible job-question pipeline
   const eligibleQueue = useMemo(
     () =>
       [...questions]
         .sort((a, b) => a.order - b.order)
-        .filter((q) => isQuestionEligible(q, answers)),
+        .filter((q) => isJobQuestionEligible(q, answers)),
     [questions, answers],
+  );
+
+  // Eligible client-question pipeline (computed against client answers)
+  const eligibleClientQueue = useMemo(
+    () =>
+      [...clientQuestions]
+        .sort((a, b) => a.order - b.order)
+        .filter((q) => isClientQuestionEligible(q, clientAnswers)),
+    [clientQuestions, clientAnswers],
   );
 
   const askedIds = useMemo(
     () =>
       new Set(
         messages
-          .filter((m) => m.role === "assistant" && (m as any).kind === "question")
+          .filter(
+            (m) =>
+              m.role === "assistant" && (m as any).kind === "question",
+          )
           .map((m) => (m as any).questionId as string),
       ),
     [messages],
   );
 
-  const currentQuestion = useMemo(() => {
+  const currentJobQuestion = useMemo(() => {
     return eligibleQueue.find((q) => answers[q.id] == null) || null;
   }, [eligibleQueue, answers]);
 
-  // Initial greeting + first question
+  const currentClientQuestion = useMemo(() => {
+    return (
+      eligibleClientQueue.find((q) => clientAnswers[q.id] == null) || null
+    );
+  }, [eligibleClientQueue, clientAnswers]);
+
+  const jobPhaseDone = phase === "job" && currentJobQuestion == null;
+
+  // Initial greeting
   useEffect(() => {
     if (messages.length === 0) {
       const intro: ChatMessage = {
@@ -209,39 +272,98 @@ const CreateJob = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Push the next question into the chat whenever it changes
+  // Push the next JOB question into chat
   useEffect(() => {
-    if (!currentQuestion) {
-      if (!completed && Object.keys(answers).length > 0) {
-        const jd = buildJD(questions, answers);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: uid(),
-            role: "assistant",
-            kind: "info",
-            text: "Perfect — I have everything I need. Here's your draft job description ✨",
-          },
-          { id: uid(), role: "assistant", kind: "jd", text: jd },
-        ]);
-        setCompleted(true);
-      }
+    if (phase !== "job") return;
+    if (!currentJobQuestion) {
+      // Job phase finished — generate JD then transition to client phase
+      if (Object.keys(answers).length === 0) return;
+      const jd = buildJD(questions, answers);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          kind: "info",
+          text: "Perfect — I have everything I need for the JD. Here's your draft ✨",
+        },
+        { id: uid(), role: "assistant", kind: "jd", text: jd },
+        {
+          id: uid(),
+          role: "assistant",
+          kind: "info",
+          text:
+            clients.length === 0
+              ? "Your client directory is empty — add clients in the admin to capture commercial details."
+              : "Now let's capture the client & commercial details for this job. These stay internal and won't appear in the JD.",
+        },
+      ]);
+      setPhase("client");
       return;
     }
-    if (askedIds.has(currentQuestion.id)) return;
+    if (askedIds.has(currentJobQuestion.id)) return;
     setMessages((prev) => [
       ...prev,
       {
         id: uid(),
         role: "assistant",
         kind: "question",
-        questionId: currentQuestion.id,
-        text: currentQuestion.text,
+        phase: "job",
+        questionId: currentJobQuestion.id,
+        text: currentJobQuestion.text,
       },
     ]);
     setMultiPick([]);
     setTextInput("");
-  }, [currentQuestion, askedIds, completed, answers, questions]);
+  }, [currentJobQuestion, askedIds, answers, questions, phase, clients.length]);
+
+  // Push the next CLIENT question into chat
+  useEffect(() => {
+    if (phase !== "client") return;
+    if (!currentClientQuestion) {
+      if (
+        eligibleClientQueue.length > 0 &&
+        Object.keys(clientAnswers).length > 0 &&
+        !completed
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "assistant",
+            kind: "info",
+            text: "All set! Client & commercial details are saved. You can download the internal sheet anytime below.",
+          },
+        ]);
+        setCompleted(true);
+      } else if (eligibleClientQueue.length === 0 && !completed) {
+        // No active client questions configured — mark completed silently
+        setCompleted(true);
+      }
+      return;
+    }
+    if (askedIds.has(currentClientQuestion.id)) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        role: "assistant",
+        kind: "question",
+        phase: "client",
+        questionId: currentClientQuestion.id,
+        text: currentClientQuestion.text,
+      },
+    ]);
+    setMultiPick([]);
+    setTextInput("");
+  }, [
+    currentClientQuestion,
+    askedIds,
+    clientAnswers,
+    phase,
+    eligibleClientQueue.length,
+    completed,
+  ]);
 
   // Auto-scroll
   useEffect(() => {
@@ -249,30 +371,42 @@ const CreateJob = () => {
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, currentQuestion]);
+  }, [messages, currentJobQuestion, currentClientQuestion]);
 
-  const submitAnswer = (value: string | string[]) => {
-    if (!currentQuestion) return;
+  // Resolve the selected client id from client answers — needed for poc_picker
+  const selectedClientIdForPoc = useMemo(() => {
+    const clientPickerQ = clientQuestions.find(
+      (q) => q.inputType === "client_picker",
+    );
+    if (!clientPickerQ) return "";
+    const v = clientAnswers[clientPickerQ.id];
+    return typeof v === "string" ? v : "";
+  }, [clientQuestions, clientAnswers]);
+
+  /* ---------- Job-phase handlers ---------- */
+
+  const submitJobAnswer = (value: string | string[]) => {
+    if (!currentJobQuestion) return;
     const display = Array.isArray(value) ? value.join(", ") : value;
-    if (!display.trim()) {
-      if (currentQuestion.required) {
-        toast({
-          title: "Answer required",
-          description: "This question is required to continue.",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!display.trim() && currentJobQuestion.required) {
+      toast({
+        title: "Answer required",
+        description: "This question is required to continue.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    // Detect bonus answers in the same utterance — only meaningful when
-    // the user typed free text (not when they tapped a suggestion pill).
     const isFreeText =
-      currentQuestion.inputType === "free_text" && typeof value === "string";
+      currentJobQuestion.inputType === "free_text" &&
+      typeof value === "string";
     const extras = isFreeText
-      ? extractAnswersFromText(value as string, questions, currentQuestion.id)
+      ? extractAnswersFromText(
+          value as string,
+          questions,
+          currentJobQuestion.id,
+        )
       : {};
-    // Don't overwrite anything the user has already answered explicitly
     const newExtras: Record<string, string | string[]> = {};
     Object.entries(extras).forEach(([qid, v]) => {
       if (answers[qid] == null) newExtras[qid] = v;
@@ -283,13 +417,14 @@ const CreateJob = () => {
       {
         id: uid(),
         role: "user",
+        phase: "job",
         text: display || "(skipped)",
-        questionId: currentQuestion.id,
+        questionId: currentJobQuestion.id,
       },
     ]);
     setAnswers((prev) => ({
       ...prev,
-      [currentQuestion.id]: value,
+      [currentJobQuestion.id]: value,
       ...newExtras,
     }));
     setTextInput("");
@@ -320,28 +455,28 @@ const CreateJob = () => {
     }
   };
 
-  const skip = () => {
-    if (!currentQuestion || currentQuestion.required) return;
+  const skipJob = () => {
+    if (!currentJobQuestion || currentJobQuestion.required) return;
     setMessages((prev) => [
       ...prev,
       {
         id: uid(),
         role: "user",
+        phase: "job",
         text: "(skipped)",
-        questionId: currentQuestion.id,
+        questionId: currentJobQuestion.id,
       },
     ]);
-    setAnswers((prev) => ({ ...prev, [currentQuestion.id]: "" }));
+    setAnswers((prev) => ({ ...prev, [currentJobQuestion.id]: "" }));
   };
 
-  const updateAnswer = (qid: string, value: string | string[]) => {
+  const updateJobAnswer = (qid: string, value: string | string[]) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }));
     setAutoFilledIds((prev) => {
       const next = new Set(prev);
       next.delete(qid);
       return next;
     });
-    // If JD is already on screen, regenerate it
     setMessages((prev) => {
       const idx = [...prev].reverse().findIndex((m) => (m as any).kind === "jd");
       if (idx === -1) return prev;
@@ -355,31 +490,101 @@ const CreateJob = () => {
     toast({ title: "Answer updated" });
   };
 
+  /* ---------- Client-phase handlers ---------- */
+
+  const submitClientAnswer = (value: string | string[]) => {
+    if (!currentClientQuestion) return;
+    const display = Array.isArray(value) ? value.join(", ") : value;
+    if (!display.trim() && currentClientQuestion.required) {
+      toast({
+        title: "Answer required",
+        description: "This question is required to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const friendly = formatAnswerForDisplay(
+      currentClientQuestion,
+      value,
+      clients,
+    );
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        role: "user",
+        phase: "client",
+        text: friendly || "(skipped)",
+        questionId: currentClientQuestion.id,
+      },
+    ]);
+    setClientAnswers((prev) => ({
+      ...prev,
+      [currentClientQuestion.id]: value,
+    }));
+    setTextInput("");
+    setMultiPick([]);
+  };
+
+  const skipClient = () => {
+    if (!currentClientQuestion || currentClientQuestion.required) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        role: "user",
+        phase: "client",
+        text: "(skipped)",
+        questionId: currentClientQuestion.id,
+      },
+    ]);
+    setClientAnswers((prev) => ({ ...prev, [currentClientQuestion.id]: "" }));
+  };
+
+  const updateClientAnswer = (qid: string, value: string | string[]) => {
+    setClientAnswers((prev) => ({ ...prev, [qid]: value }));
+    toast({ title: "Answer updated" });
+  };
+
+  /* ---------- Misc ---------- */
+
   const restart = () => {
     setAnswers({});
+    setClientAnswers({});
     setMessages([]);
+    setPhase("job");
     setCompleted(false);
     setTextInput("");
     setMultiPick([]);
     setAutoFilledIds(new Set());
     setEditingId(null);
-    setSelectedClientId("");
-    setSelectedPocId("");
-    setClientSubmitted(false);
+    setEditingClientId(null);
   };
 
-  const totalActive = eligibleQueue.length || 1;
-  const answeredCount = eligibleQueue.filter(
-    (q) => answers[q.id] != null,
-  ).length;
-  const progress = Math.min(100, Math.round((answeredCount / totalActive) * 100));
+  const totalActive =
+    phase === "job"
+      ? eligibleQueue.length || 1
+      : eligibleClientQueue.length || 1;
+  const answeredCount =
+    phase === "job"
+      ? eligibleQueue.filter((q) => answers[q.id] != null).length
+      : eligibleClientQueue.filter((q) => clientAnswers[q.id] != null).length;
+  const progress = Math.min(
+    100,
+    Math.round((answeredCount / totalActive) * 100),
+  );
 
   const lastJd = [...messages].reverse().find((m) => (m as any).kind === "jd");
 
   const copyJD = async () => {
     if (!lastJd) return;
     await navigator.clipboard.writeText((lastJd as any).text);
-    toast({ title: "Copied", description: "Job description copied to clipboard." });
+    toast({
+      title: "Copied",
+      description: "Job description copied to clipboard.",
+    });
   };
 
   const fileSlug =
@@ -398,48 +603,34 @@ const CreateJob = () => {
   };
 
   const downloadInternal = () => {
-    if (!clientSubmitted || !selectedClient || !selectedPoc) return;
     const lines: string[] = [];
-    lines.push(`# Internal: Client & POC — ${(answers["q-1"] as string) || "Job"}`);
+    lines.push(
+      `# Internal: Client & Commercial — ${(answers["q-1"] as string) || "Job"}`,
+    );
     lines.push("");
     lines.push("> Internal recruiter use only. Do NOT share with candidates.");
     lines.push("");
-    lines.push("## Client");
-    lines.push(`- **Name:** ${selectedClient.name}`);
-    if (selectedClient.industry) lines.push(`- **Industry:** ${selectedClient.industry}`);
-    if (selectedClient.location) lines.push(`- **Location:** ${selectedClient.location}`);
-    if (selectedClient.website) lines.push(`- **Website:** ${selectedClient.website}`);
-    lines.push("");
-    lines.push("## Point of Contact");
-    lines.push(`- **Name:** ${selectedPoc.name}`);
-    if (selectedPoc.designation) lines.push(`- **Designation:** ${selectedPoc.designation}`);
-    lines.push(`- **Email:** ${selectedPoc.email}`);
-    if (selectedPoc.phone) lines.push(`- **Phone:** ${selectedPoc.phone}`);
-    if (selectedPoc.notes) lines.push(`- **Notes:** ${selectedPoc.notes}`);
+    lines.push("## Client questionnaire");
+    eligibleClientQueue.forEach((q) => {
+      const a = clientAnswers[q.id];
+      if (a == null) return;
+      const v = formatAnswerForDisplay(q, a, clients);
+      lines.push(`- **${q.text}** ${v || "(skipped)"}`);
+    });
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${fileSlug}-client-poc.md`;
+    a.download = `${fileSlug}-client-internal.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const submitClientForm = () => {
-    if (!selectedClient) {
-      toast({ title: "Select a client", variant: "destructive" });
-      return;
-    }
-    if (!selectedPoc) {
-      toast({ title: "Select a point of contact", variant: "destructive" });
-      return;
-    }
-    setClientSubmitted(true);
-    toast({
-      title: "Client & POC linked",
-      description: `${selectedClient.name} · ${selectedPoc.name}`,
-    });
-  };
+  const currentQuestion =
+    phase === "job" ? currentJobQuestion : currentClientQuestion;
+  const handleSubmit =
+    phase === "job" ? submitJobAnswer : submitClientAnswer;
+  const handleSkip = phase === "job" ? skipJob : skipClient;
 
   return (
     <div className="min-h-screen bg-background">
@@ -484,7 +675,6 @@ const CreateJob = () => {
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           {/* Chat column */}
           <Card className="relative overflow-hidden border-border/60">
-            {/* Ambient glow */}
             <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
 
@@ -494,9 +684,25 @@ const CreateJob = () => {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Bot className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Glohire Assistant</span>
+                    <span className="text-sm font-medium">
+                      Glohire Assistant
+                    </span>
                     <Badge variant="secondary" className="text-[10px]">
                       AI
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] gap-1 border-primary/40 text-primary"
+                    >
+                      {phase === "job" ? (
+                        <>
+                          <Sparkles className="h-2.5 w-2.5" /> Step 1: JD
+                        </>
+                      ) : (
+                        <>
+                          <Building2 className="h-2.5 w-2.5" /> Step 2: Client
+                        </>
+                      )}
                     </Badge>
                   </div>
                   <span className="text-xs text-muted-foreground">
@@ -522,9 +728,7 @@ const CreateJob = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary" />
-                      {clientSubmitted
-                        ? "Job, client & POC saved"
-                        : "JD ready — add client & POC below"}
+                      Job, JD &amp; client details saved
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={copyJD}>
@@ -533,27 +737,53 @@ const CreateJob = () => {
                       <Button variant="outline" size="sm" onClick={downloadJD}>
                         <Download className="h-4 w-4" /> Download JD
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={downloadInternal}
+                      >
+                        <Download className="h-4 w-4" /> Internal sheet
+                      </Button>
                       <Button variant="hero" size="sm" onClick={restart}>
                         <RefreshCw className="h-4 w-4" /> New Job
                       </Button>
                     </div>
                   </div>
                 ) : currentQuestion ? (
-                  <AnswerInput
-                    key={currentQuestion.id}
-                    question={currentQuestion}
-                    textInput={textInput}
-                    setTextInput={setTextInput}
-                    multiPick={multiPick}
-                    setMultiPick={setMultiPick}
-                    onSubmit={submitAnswer}
-                    onSkip={skip}
-                  />
+                  phase === "job" ? (
+                    <JobAnswerInput
+                      key={currentQuestion.id}
+                      question={currentQuestion as ChatQuestion}
+                      textInput={textInput}
+                      setTextInput={setTextInput}
+                      multiPick={multiPick}
+                      setMultiPick={setMultiPick}
+                      onSubmit={handleSubmit}
+                      onSkip={handleSkip}
+                    />
+                  ) : (
+                    <ClientAnswerInput
+                      key={currentQuestion.id}
+                      question={currentQuestion as ClientQuestion}
+                      textInput={textInput}
+                      setTextInput={setTextInput}
+                      multiPick={multiPick}
+                      setMultiPick={setMultiPick}
+                      onSubmit={handleSubmit}
+                      onSkip={handleSkip}
+                      clients={clients}
+                      selectedClientIdForPoc={selectedClientIdForPoc}
+                    />
+                  )
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    No active questions configured.{" "}
+                    No active questions configured for this step.{" "}
                     <Link
-                      to="/admin/system-behavior"
+                      to={
+                        phase === "job"
+                          ? "/admin/system-behavior"
+                          : "/admin/client-fields"
+                      }
                       className="text-primary underline-offset-4 hover:underline"
                     >
                       Open admin
@@ -570,7 +800,7 @@ const CreateJob = () => {
             <Card className="p-5 border-border/60">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Live Summary</h2>
+                <h2 className="text-sm font-semibold">JD Summary</h2>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
                 Built from active questions in System Behavior.
@@ -633,6 +863,81 @@ const CreateJob = () => {
               </ul>
             </Card>
 
+            {(jobPhaseDone || phase === "client" || completed) && (
+              <Card className="p-5 border-border/60">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold">Client Summary</h2>
+                  <Badge
+                    variant="outline"
+                    className="ml-auto text-[10px] gap-1 border-primary/40 text-primary"
+                  >
+                    Internal
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Configurable from{" "}
+                  <Link
+                    to="/admin/client-fields"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Client questions admin
+                  </Link>
+                  .
+                </p>
+                <ul className="space-y-3">
+                  {eligibleClientQueue.map((q) => {
+                    const a = clientAnswers[q.id];
+                    const answered = a != null;
+                    const display = answered
+                      ? formatAnswerForDisplay(q, a, clients)
+                      : "—";
+                    return (
+                      <li key={q.id} className="text-sm group">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                              answered
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {answered ? (
+                              <Check className="h-2.5 w-2.5" />
+                            ) : (
+                              "•"
+                            )}
+                          </span>
+                          <span className="text-muted-foreground line-clamp-1 flex-1">
+                            {q.text}
+                          </span>
+                          {answered && (
+                            <button
+                              onClick={() => setEditingClientId(q.id)}
+                              className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                              aria-label={`Edit answer for ${q.text}`}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                        {answered && (
+                          <p className="ml-6 mt-1 text-foreground line-clamp-2">
+                            {display || "(skipped)"}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {eligibleClientQueue.length === 0 && (
+                    <li className="text-xs text-muted-foreground">
+                      No active client questions configured.
+                    </li>
+                  )}
+                </ul>
+              </Card>
+            )}
+
             <Card className="p-5 border-border/60">
               <h3 className="text-sm font-semibold mb-2">Tip</h3>
               <p className="text-xs text-muted-foreground">
@@ -648,304 +953,42 @@ const CreateJob = () => {
             </Card>
           </aside>
         </div>
-
-        {/* Post-JD: Client & POC capture */}
-        {completed && (
-          <ClientPocSection
-            clients={clients}
-            selectedClientId={selectedClientId}
-            selectedPocId={selectedPocId}
-            onSelectClient={(id) => {
-              setSelectedClientId(id);
-              setSelectedPocId("");
-            }}
-            onSelectPoc={setSelectedPocId}
-            onSubmit={submitClientForm}
-            submitted={clientSubmitted}
-            onEdit={() => setClientSubmitted(false)}
-            onDownloadInternal={downloadInternal}
-          />
-        )}
       </main>
 
-      <EditAnswerDialog
+      {/* Edit JOB answer */}
+      <EditJobAnswerDialog
         question={
           editingId ? questions.find((q) => q.id === editingId) || null : null
         }
         currentValue={editingId ? answers[editingId] : undefined}
         onClose={() => setEditingId(null)}
         onSave={(qid, value) => {
-          updateAnswer(qid, value);
+          updateJobAnswer(qid, value);
           setEditingId(null);
+        }}
+      />
+
+      {/* Edit CLIENT answer */}
+      <EditClientAnswerDialog
+        question={
+          editingClientId
+            ? clientQuestions.find((q) => q.id === editingClientId) || null
+            : null
+        }
+        currentValue={
+          editingClientId ? clientAnswers[editingClientId] : undefined
+        }
+        clients={clients}
+        selectedClientIdForPoc={selectedClientIdForPoc}
+        onClose={() => setEditingClientId(null)}
+        onSave={(qid, value) => {
+          updateClientAnswer(qid, value);
+          setEditingClientId(null);
         }}
       />
     </div>
   );
 };
-
-const ClientPocSection = ({
-  clients,
-  selectedClientId,
-  selectedPocId,
-  onSelectClient,
-  onSelectPoc,
-  onSubmit,
-  submitted,
-  onEdit,
-  onDownloadInternal,
-}: {
-  clients: Client[];
-  selectedClientId: string;
-  selectedPocId: string;
-  onSelectClient: (id: string) => void;
-  onSelectPoc: (id: string) => void;
-  onSubmit: () => void;
-  submitted: boolean;
-  onEdit: () => void;
-  onDownloadInternal: () => void;
-}) => {
-  const selectedClient = clients.find((c) => c.id === selectedClientId) || null;
-  const selectedPoc =
-    selectedClient?.pocs.find((p) => p.id === selectedPocId) || null;
-
-  if (clients.length === 0) {
-    return (
-      <Card className="mt-6 p-6 border-dashed border-border/60">
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Building2 className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="font-display text-base font-semibold">
-              No clients in your directory
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add clients and their POCs in{" "}
-              <Link
-                to="/admin/client-fields"
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                System Behavior → Clients &amp; POCs
-              </Link>
-              , then come back to assign one to this job.
-            </p>
-          </div>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="mt-6 relative overflow-hidden border-border/60">
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
-              <Building2 className="h-4 w-4 text-primary-foreground" />
-            </span>
-            <div>
-              <h2 className="font-display text-lg font-semibold">
-                Assign Client &amp; Point of Contact
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Select an existing client and POC from your directory.{" "}
-                <span className="text-foreground font-medium">
-                  Never appears in the JD.
-                </span>
-              </p>
-            </div>
-          </div>
-          <Badge variant="outline" className="gap-1.5 border-primary/40 text-primary">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            Internal
-          </Badge>
-        </div>
-
-        {submitted && selectedClient && selectedPoc ? (
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <SelectedClientCard client={selectedClient} />
-            <SelectedPocCard poc={selectedPoc} />
-            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Check className="h-4 w-4 text-primary" />
-                Linked to this job
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={onEdit}>
-                  Change selection
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onDownloadInternal}
-                >
-                  <Download className="h-4 w-4" /> Download internal sheet
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mt-5 grid gap-6 md:grid-cols-2">
-              {/* Client picker */}
-              <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <Building2 className="h-4 w-4" />
-                  </span>
-                  <h3 className="text-sm font-semibold">Client</h3>
-                </div>
-                <Label htmlFor="client-pick" className="text-xs">
-                  Select client
-                  <span className="text-destructive ml-0.5">*</span>
-                </Label>
-                <Select value={selectedClientId} onValueChange={onSelectClient}>
-                  <SelectTrigger id="client-pick" className="mt-1.5">
-                    <SelectValue placeholder="Choose a client..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                        {c.industry ? ` · ${c.industry}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedClient && (
-                  <div className="mt-3 rounded-lg bg-secondary/40 p-3 text-xs text-muted-foreground space-y-1">
-                    {selectedClient.location && (
-                      <div>📍 {selectedClient.location}</div>
-                    )}
-                    {selectedClient.website && (
-                      <div className="truncate">🌐 {selectedClient.website}</div>
-                    )}
-                    <div>
-                      👥 {selectedClient.pocs.length} POC
-                      {selectedClient.pocs.length === 1 ? "" : "s"} on file
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* POC picker */}
-              <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <UserRound className="h-4 w-4" />
-                  </span>
-                  <h3 className="text-sm font-semibold">Point of Contact</h3>
-                </div>
-                <Label htmlFor="poc-pick" className="text-xs">
-                  Select POC
-                  <span className="text-destructive ml-0.5">*</span>
-                </Label>
-                <Select
-                  value={selectedPocId}
-                  onValueChange={onSelectPoc}
-                  disabled={!selectedClient}
-                >
-                  <SelectTrigger id="poc-pick" className="mt-1.5">
-                    <SelectValue
-                      placeholder={
-                        selectedClient
-                          ? selectedClient.pocs.length === 0
-                            ? "No POCs for this client"
-                            : "Choose a POC..."
-                          : "Select a client first"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedClient?.pocs.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                        {p.designation ? ` · ${p.designation}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedPoc && (
-                  <div className="mt-3 rounded-lg bg-secondary/40 p-3 text-xs text-muted-foreground space-y-1">
-                    <div className="truncate">✉️ {selectedPoc.email}</div>
-                    {selectedPoc.phone && <div>📞 {selectedPoc.phone}</div>}
-                    {selectedPoc.notes && (
-                      <div className="italic line-clamp-2">
-                        “{selectedPoc.notes}”
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/60">
-              <p className="text-xs text-muted-foreground">
-                Don't see them? Add new clients or POCs in{" "}
-                <Link
-                  to="/admin/client-fields"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  System Behavior → Clients &amp; POCs
-                </Link>
-                .
-              </p>
-              <Button
-                variant="hero"
-                size="sm"
-                onClick={onSubmit}
-                disabled={!selectedClient || !selectedPoc}
-              >
-                <Check className="h-4 w-4" /> Link to job
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-    </Card>
-  );
-};
-
-const SelectedClientCard = ({ client }: { client: Client }) => (
-  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-    <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-      <Building2 className="h-3.5 w-3.5" />
-      Client
-    </div>
-    <p className="text-base font-display font-semibold">{client.name}</p>
-    {client.industry && (
-      <Badge variant="secondary" className="mt-1 text-[10px]">
-        {client.industry}
-      </Badge>
-    )}
-    <dl className="mt-3 space-y-1.5 text-xs">
-      {client.location && (
-        <div className="text-muted-foreground">📍 {client.location}</div>
-      )}
-      {client.website && (
-        <div className="truncate text-muted-foreground">🌐 {client.website}</div>
-      )}
-    </dl>
-  </div>
-);
-
-const SelectedPocCard = ({ poc }: { poc: POC }) => (
-  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-    <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-      <UserRound className="h-3.5 w-3.5" />
-      Point of Contact
-    </div>
-    <p className="text-base font-display font-semibold">{poc.name}</p>
-    {poc.designation && (
-      <p className="text-xs text-muted-foreground">{poc.designation}</p>
-    )}
-    <dl className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-      <div className="truncate">✉️ {poc.email}</div>
-      {poc.phone && <div>📞 {poc.phone}</div>}
-      {poc.notes && <div className="italic line-clamp-2">“{poc.notes}”</div>}
-    </dl>
-  </div>
-);
 
 const MessageBubble = ({ message }: { message: ChatMessage }) => {
   if (message.role === "assistant" && message.kind === "jd") {
@@ -971,7 +1014,7 @@ const MessageBubble = ({ message }: { message: ChatMessage }) => {
     return (
       <div className="flex gap-3">
         <Avatar role="assistant" />
-        <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-2.5 text-sm">
+        <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-2.5 text-sm whitespace-pre-wrap">
           {message.text}
         </div>
       </div>
@@ -1004,7 +1047,9 @@ const Avatar = ({ role }: { role: "assistant" | "user" }) => (
   </div>
 );
 
-const AnswerInput = ({
+/* ---------- Job answer input (unchanged behaviour) ---------- */
+
+const JobAnswerInput = ({
   question,
   textInput,
   setTextInput,
@@ -1022,7 +1067,9 @@ const AnswerInput = ({
   onSkip: () => void;
 }) => {
   const showSuggested =
-    question.suggestedEnabled && question.options && question.options.length > 0;
+    question.suggestedEnabled &&
+    question.options &&
+    question.options.length > 0;
 
   if (question.inputType === "single_select") {
     return (
@@ -1143,7 +1190,12 @@ const AnswerInput = ({
             Skip
           </Button>
         )}
-        <Button type="submit" variant="hero" size="sm" disabled={!textInput.trim()}>
+        <Button
+          type="submit"
+          variant="hero"
+          size="sm"
+          disabled={!textInput.trim()}
+        >
           <Send className="h-4 w-4" /> Send
         </Button>
       </form>
@@ -1154,7 +1206,379 @@ const AnswerInput = ({
   );
 };
 
-const EditAnswerDialog = ({
+/* ---------- Client answer input ---------- */
+
+const ClientAnswerInput = ({
+  question,
+  textInput,
+  setTextInput,
+  multiPick,
+  setMultiPick,
+  onSubmit,
+  onSkip,
+  clients,
+  selectedClientIdForPoc,
+}: {
+  question: ClientQuestion;
+  textInput: string;
+  setTextInput: (v: string) => void;
+  multiPick: string[];
+  setMultiPick: (v: string[]) => void;
+  onSubmit: (value: string | string[]) => void;
+  onSkip: () => void;
+  clients: Client[];
+  selectedClientIdForPoc: string;
+}) => {
+  // CLIENT_PICKER
+  if (question.inputType === "client_picker") {
+    return (
+      <ClientPickerInput
+        clients={clients}
+        onSubmit={(id) => onSubmit(id)}
+        required={question.required}
+        onSkip={onSkip}
+      />
+    );
+  }
+
+  // POC_PICKER
+  if (question.inputType === "poc_picker") {
+    return (
+      <PocPickerInput
+        clients={clients}
+        selectedClientId={selectedClientIdForPoc}
+        onSubmit={(id) => onSubmit(id)}
+        required={question.required}
+        onSkip={onSkip}
+      />
+    );
+  }
+
+  // SINGLE_SELECT
+  if (question.inputType === "single_select") {
+    return (
+      <div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {question.options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => onSubmit(opt)}
+              className="px-3 py-1.5 rounded-full border border-border bg-card text-sm hover:border-primary hover:bg-primary/10 transition-colors"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {question.required ? "Required" : "Optional — you can skip"}
+          </span>
+          {!question.required && (
+            <Button variant="ghost" size="sm" onClick={onSkip}>
+              Skip
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // MULTI_SELECT
+  if (question.inputType === "multi_select") {
+    const toggle = (opt: string) =>
+      setMultiPick(
+        multiPick.includes(opt)
+          ? multiPick.filter((o) => o !== opt)
+          : [...multiPick, opt],
+      );
+    return (
+      <div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {question.options.map((opt) => {
+            const active = multiPick.includes(opt);
+            return (
+              <button
+                key={opt}
+                onClick={() => toggle(opt)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                  active
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border bg-card hover:border-primary/60"
+                }`}
+              >
+                <Checkbox
+                  checked={active}
+                  className="pointer-events-none h-3.5 w-3.5"
+                />
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            {multiPick.length} selected
+            {question.required ? " · Required" : " · Optional"}
+          </span>
+          <div className="flex items-center gap-2">
+            {!question.required && (
+              <Button variant="ghost" size="sm" onClick={onSkip}>
+                Skip
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="hero"
+              disabled={multiPick.length === 0}
+              onClick={() => onSubmit(multiPick)}
+            >
+              <Send className="h-4 w-4" /> Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // NUMBER / CURRENCY / FREE_TEXT
+  const inputType =
+    question.inputType === "number" || question.inputType === "currency"
+      ? "number"
+      : "text";
+  const placeholder =
+    question.inputType === "currency"
+      ? "e.g. 75 (per hour) or 12000 (monthly)"
+      : question.inputType === "number"
+        ? "Enter a number…"
+        : "Type your answer…";
+
+  return (
+    <div>
+      {question.suggestedEnabled && question.options.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {question.options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => onSubmit(opt)}
+              className="px-3 py-1.5 rounded-full border border-border bg-card text-xs text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(textInput.trim());
+        }}
+        className="flex items-center gap-2"
+      >
+        {question.inputType === "currency" && (
+          <span className="text-sm text-muted-foreground pl-1">$</span>
+        )}
+        <Input
+          autoFocus
+          type={inputType}
+          inputMode={inputType === "number" ? "decimal" : "text"}
+          value={textInput}
+          onChange={(e) => setTextInput(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1"
+        />
+        {!question.required && (
+          <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
+            Skip
+          </Button>
+        )}
+        <Button
+          type="submit"
+          variant="hero"
+          size="sm"
+          disabled={!textInput.trim()}
+        >
+          <Send className="h-4 w-4" /> Send
+        </Button>
+      </form>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {question.required ? "Required" : "Optional"}
+      </p>
+    </div>
+  );
+};
+
+const ClientPickerInput = ({
+  clients,
+  onSubmit,
+  required,
+  onSkip,
+}: {
+  clients: Client[];
+  onSubmit: (id: string) => void;
+  required: boolean;
+  onSkip: () => void;
+}) => {
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.industry?.toLowerCase().includes(q) ||
+        c.location?.toLowerCase().includes(q),
+    );
+  }, [clients, search]);
+
+  if (clients.length === 0) {
+    return (
+      <div className="rounded-xl bg-secondary/40 border border-dashed border-border p-4 text-sm text-muted-foreground">
+        Your client directory is empty. Add clients in the admin first.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="relative mb-3">
+        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          autoFocus
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search clients..."
+          className="pl-9"
+        />
+      </div>
+      <div className="max-h-56 overflow-y-auto rounded-xl border border-border bg-background/40">
+        {filtered.length === 0 ? (
+          <p className="p-4 text-xs text-muted-foreground text-center">
+            No matches.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {filtered.map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => onSubmit(c.id)}
+                  className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center gap-3"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
+                    <Building2 className="h-4 w-4" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {c.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {[c.industry, c.location].filter(Boolean).join(" · ")} ·{" "}
+                      {c.pocs.length} POC{c.pocs.length === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {required ? "Required" : "Optional — you can skip"}
+        </span>
+        {!required && (
+          <Button variant="ghost" size="sm" onClick={onSkip}>
+            Skip
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PocPickerInput = ({
+  clients,
+  selectedClientId,
+  onSubmit,
+  required,
+  onSkip,
+}: {
+  clients: Client[];
+  selectedClientId: string;
+  onSubmit: (id: string) => void;
+  required: boolean;
+  onSkip: () => void;
+}) => {
+  const client = clients.find((c) => c.id === selectedClientId) || null;
+
+  if (!client) {
+    return (
+      <div className="rounded-xl bg-secondary/40 border border-dashed border-border p-4 text-sm text-muted-foreground">
+        Select a client first — POCs will be filtered to that client.
+      </div>
+    );
+  }
+
+  if (client.pocs.length === 0) {
+    return (
+      <div className="rounded-xl bg-secondary/40 border border-dashed border-border p-4 text-sm text-muted-foreground">
+        No POCs on file for {client.name}. Skip and add one to the directory
+        later.
+        {!required && (
+          <div className="mt-2">
+            <Button variant="ghost" size="sm" onClick={onSkip}>
+              Skip
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-2 text-xs text-muted-foreground">
+        POCs for{" "}
+        <span className="text-foreground font-medium">{client.name}</span>
+      </div>
+      <div className="max-h-56 overflow-y-auto rounded-xl border border-border bg-background/40">
+        <ul className="divide-y divide-border">
+          {client.pocs.map((p) => (
+            <li key={p.id}>
+              <button
+                onClick={() => onSubmit(p.id)}
+                className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center gap-3"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
+                  <UserRound className="h-4 w-4" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{p.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {[p.designation, p.email].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {required ? "Required" : "Optional — you can skip"}
+        </span>
+        {!required && (
+          <Button variant="ghost" size="sm" onClick={onSkip}>
+            Skip
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Edit dialogs ---------- */
+
+const EditJobAnswerDialog = ({
   question,
   currentValue,
   onClose,
@@ -1284,6 +1708,209 @@ const EditAnswerDialog = ({
               </div>
             )}
         </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="hero"
+            onClick={handleSave}
+            disabled={
+              question.inputType === "multi_select"
+                ? multi.length === 0 && question.required
+                : !text.trim() && question.required
+            }
+          >
+            <Sparkle className="h-4 w-4" />
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const EditClientAnswerDialog = ({
+  question,
+  currentValue,
+  clients,
+  selectedClientIdForPoc,
+  onClose,
+  onSave,
+}: {
+  question: ClientQuestion | null;
+  currentValue: string | string[] | undefined;
+  clients: Client[];
+  selectedClientIdForPoc: string;
+  onClose: () => void;
+  onSave: (qid: string, value: string | string[]) => void;
+}) => {
+  const [text, setText] = useState("");
+  const [multi, setMulti] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!question) return;
+    if (question.inputType === "multi_select") {
+      setMulti(Array.isArray(currentValue) ? currentValue : []);
+      setText("");
+    } else {
+      setText(typeof currentValue === "string" ? currentValue : "");
+      setMulti([]);
+    }
+  }, [question, currentValue]);
+
+  if (!question) return null;
+
+  const handleSave = () => {
+    if (question.inputType === "multi_select") {
+      onSave(question.id, multi);
+    } else {
+      onSave(question.id, text.trim());
+    }
+  };
+
+  const toggleMulti = (opt: string) =>
+    setMulti((prev) =>
+      prev.includes(opt) ? prev.filter((o) => o !== opt) : [...prev, opt],
+    );
+
+  const renderBody = () => {
+    if (question.inputType === "client_picker") {
+      return (
+        <Select value={text} onValueChange={(v) => setText(v)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a client..." />
+          </SelectTrigger>
+          <SelectContent>
+            {clients.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+                {c.industry ? ` · ${c.industry}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    if (question.inputType === "poc_picker") {
+      const client = clients.find((c) => c.id === selectedClientIdForPoc);
+      const pocs = client?.pocs ?? [];
+      return (
+        <Select
+          value={text}
+          onValueChange={(v) => setText(v)}
+          disabled={!client}
+        >
+          <SelectTrigger>
+            <SelectValue
+              placeholder={
+                client
+                  ? pocs.length === 0
+                    ? "No POCs for this client"
+                    : "Choose a POC..."
+                  : "Select a client first"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {pocs.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+                {p.designation ? ` · ${p.designation}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    if (question.inputType === "single_select") {
+      return (
+        <div className="flex flex-wrap gap-2">
+          {question.options.map((opt) => {
+            const active = text === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => setText(opt)}
+                className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                  active
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border bg-card hover:border-primary/60"
+                }`}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+    if (question.inputType === "multi_select") {
+      return (
+        <>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {question.options.map((opt) => {
+              const active = multi.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  onClick={() => toggleMulti(opt)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                    active
+                      ? "border-primary bg-primary/15 text-foreground"
+                      : "border-border bg-card hover:border-primary/60"
+                  }`}
+                >
+                  <Checkbox
+                    checked={active}
+                    className="pointer-events-none h-3.5 w-3.5"
+                  />
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {multi.length} selected
+          </p>
+        </>
+      );
+    }
+
+    const inputType =
+      question.inputType === "number" || question.inputType === "currency"
+        ? "number"
+        : "text";
+    return (
+      <div className="flex items-center gap-2">
+        {question.inputType === "currency" && (
+          <span className="text-sm text-muted-foreground">$</span>
+        )}
+        <Input
+          autoFocus
+          type={inputType}
+          inputMode={inputType === "number" ? "decimal" : "text"}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type your answer…"
+        />
+      </div>
+    );
+  };
+
+  return (
+    <Dialog open={!!question} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-primary" />
+            Edit client answer
+          </DialogTitle>
+          <DialogDescription>{question.text}</DialogDescription>
+        </DialogHeader>
+
+        <div className="py-2">{renderBody()}</div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
