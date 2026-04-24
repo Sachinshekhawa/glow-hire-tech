@@ -1,26 +1,45 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   ArrowLeft,
   Building2,
+  Check,
   ChevronDown,
   ChevronRight,
-  Mail,
-  MapPin,
+  GitBranch,
+  GripVertical,
   Pencil,
-  Phone,
   Plus,
   Search,
   Sparkles,
   Trash2,
-  UserRound,
-  Globe,
+  X,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -47,212 +66,250 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "@/components/ui/use-toast";
-
-import { Client, POC, industryOptions } from "@/data/clients";
-import { loadClients, saveClients } from "@/data/clientsStore";
+import {
+  ClientCondition,
+  ClientInputType,
+  ClientQuestion,
+  aiGenerateClientOptions,
+} from "@/data/clientQuestions";
+import {
+  loadClientQuestions,
+  saveClientQuestions,
+} from "@/data/clientQuestionsStore";
+import { loadClients } from "@/data/clientsStore";
 import { SectionSwitcher } from "./ClientFieldsAdmin.shared";
 
+const MAX_WORDS = 50;
+const MAX_OPTIONS = 50;
+const MAX_AI_OPTIONS = 10;
+
+const inputTypeLabel: Record<ClientInputType, string> = {
+  free_text: "Free text",
+  single_select: "Single select",
+  multi_select: "Multi select",
+  number: "Number",
+  currency: "Currency",
+  client_picker: "Client (from DB)",
+  poc_picker: "POC (from DB)",
+};
+
+const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-type ClientDraft = Client;
-type POCDraft = POC & { clientId: string };
+type FilterStatus = "all" | "active" | "inactive";
 
-const emptyClient = (): ClientDraft => ({
-  id: `cl-${uid()}`,
-  name: "",
-  industry: "",
-  website: "",
-  location: "",
-  pocs: [],
-});
+type EditorState = {
+  open: boolean;
+  mode: "create" | "edit";
+  draft: ClientQuestion;
+};
 
-const emptyPoc = (clientId: string): POCDraft => ({
-  clientId,
-  id: `poc-${uid()}`,
-  name: "",
-  designation: "",
-  email: "",
-  phone: "",
-  notes: "",
+const emptyDraft = (order: number): ClientQuestion => ({
+  id: `cq-${uid()}`,
+  text: "",
+  inputType: "free_text",
+  active: true,
+  required: false,
+  options: [],
+  suggestedEnabled: false,
+  conditions: [],
+  order,
 });
 
 const ClientFieldsAdmin = () => {
-  const [clients, setClients] = useState<Client[]>(() => loadClients());
+  const [questions, setQuestions] = useState<ClientQuestion[]>(() =>
+    loadClientQuestions(),
+  );
 
   useEffect(() => {
-    saveClients(clients);
-  }, [clients]);
+    saveClientQuestions(questions);
+  }, [questions]);
 
-  const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const [clientEditor, setClientEditor] = useState<{
-    open: boolean;
-    mode: "create" | "edit";
-    draft: ClientDraft;
-  }>({ open: false, mode: "create", draft: emptyClient() });
-
-  const [pocEditor, setPocEditor] = useState<{
-    open: boolean;
-    mode: "create" | "edit";
-    draft: POCDraft;
-  }>({ open: false, mode: "create", draft: emptyPoc("") });
-
-  const [confirmDelete, setConfirmDelete] = useState<{
-    open: boolean;
-    kind: "client" | "poc" | null;
-    clientId: string | null;
-    pocId: string | null;
-  }>({ open: false, kind: null, clientId: null, pocId: null });
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.industry?.toLowerCase().includes(q) ||
-        c.pocs.some(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            p.email.toLowerCase().includes(q),
-        ),
-    );
-  }, [clients, search]);
-
+  // Read-only DB stats — surface so the admin knows the picker pool
+  const [clients] = useState(() => loadClients());
   const totalPocs = clients.reduce((acc, c) => acc + c.pocs.length, 0);
 
-  const toggleExpand = (id: string) =>
-    setExpanded((prev) => {
+  const [filter, setFilter] = useState<FilterStatus>("all");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [editor, setEditor] = useState<EditorState>({
+    open: false,
+    mode: "create",
+    draft: emptyDraft(0),
+  });
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    ids: string[];
+  }>({ open: false, ids: [] });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const visible = useMemo(() => {
+    return questions
+      .filter((q) =>
+        filter === "all" ? true : filter === "active" ? q.active : !q.active,
+      )
+      .filter((q) =>
+        search.trim()
+          ? q.text.toLowerCase().includes(search.toLowerCase())
+          : true,
+      );
+  }, [questions, filter, search]);
+
+  const allVisibleSelected =
+    visible.length > 0 && visible.every((q) => selected.has(q.id));
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-
-  /* -------- Client CRUD -------- */
-  const openCreateClient = () =>
-    setClientEditor({ open: true, mode: "create", draft: emptyClient() });
-
-  const openEditClient = (c: Client) =>
-    setClientEditor({
-      open: true,
-      mode: "edit",
-      draft: JSON.parse(JSON.stringify(c)),
-    });
-
-  const saveClient = () => {
-    const d = clientEditor.draft;
-    if (!d.name.trim()) {
-      toast({ title: "Client name is required", variant: "destructive" });
-      return;
-    }
-    const dup = clients.some(
-      (c) =>
-        c.id !== d.id &&
-        c.name.trim().toLowerCase() === d.name.trim().toLowerCase(),
-    );
-    if (dup) {
-      toast({ title: "A client with this name already exists", variant: "destructive" });
-      return;
-    }
-    setClients((prev) => {
-      if (clientEditor.mode === "create") return [...prev, { ...d, name: d.name.trim() }];
-      return prev.map((c) => (c.id === d.id ? { ...d, name: d.name.trim() } : c));
-    });
-    toast({ title: clientEditor.mode === "create" ? "Client added" : "Client updated" });
-    setClientEditor((s) => ({ ...s, open: false }));
   };
 
-  const deleteClient = (id: string) =>
-    setConfirmDelete({ open: true, kind: "client", clientId: id, pocId: null });
-
-  /* -------- POC CRUD -------- */
-  const openCreatePoc = (clientId: string) =>
-    setPocEditor({ open: true, mode: "create", draft: emptyPoc(clientId) });
-
-  const openEditPoc = (clientId: string, p: POC) =>
-    setPocEditor({
-      open: true,
-      mode: "edit",
-      draft: { ...JSON.parse(JSON.stringify(p)), clientId },
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visible.forEach((q) => next.delete(q.id));
+      } else {
+        visible.forEach((q) => next.add(q.id));
+      }
+      return next;
     });
-
-  const savePoc = () => {
-    const d = pocEditor.draft;
-    if (!d.name.trim()) {
-      toast({ title: "POC name is required", variant: "destructive" });
-      return;
-    }
-    if (!d.email.trim()) {
-      toast({ title: "POC email is required", variant: "destructive" });
-      return;
-    }
-    setClients((prev) =>
-      prev.map((c) => {
-        if (c.id !== d.clientId) return c;
-        if (pocEditor.mode === "create") {
-          return {
-            ...c,
-            pocs: [
-              ...c.pocs,
-              {
-                id: d.id,
-                name: d.name.trim(),
-                designation: d.designation?.trim() || "",
-                email: d.email.trim(),
-                phone: d.phone?.trim() || "",
-                notes: d.notes?.trim() || "",
-              },
-            ],
-          };
-        }
-        return {
-          ...c,
-          pocs: c.pocs.map((p) =>
-            p.id === d.id
-              ? {
-                  id: d.id,
-                  name: d.name.trim(),
-                  designation: d.designation?.trim() || "",
-                  email: d.email.trim(),
-                  phone: d.phone?.trim() || "",
-                  notes: d.notes?.trim() || "",
-                }
-              : p,
-          ),
-        };
-      }),
-    );
-    setExpanded((prev) => new Set(prev).add(d.clientId));
-    toast({ title: pocEditor.mode === "create" ? "POC added" : "POC updated" });
-    setPocEditor((s) => ({ ...s, open: false }));
   };
 
-  const deletePoc = (clientId: string, pocId: string) =>
-    setConfirmDelete({ open: true, kind: "poc", clientId, pocId });
+  const openCreate = () => {
+    setEditor({
+      open: true,
+      mode: "create",
+      draft: emptyDraft(questions.length),
+    });
+  };
+
+  const openEdit = (q: ClientQuestion) => {
+    setEditor({
+      open: true,
+      mode: "edit",
+      draft: JSON.parse(JSON.stringify(q)),
+    });
+  };
+
+  const closeEditor = () => setEditor((s) => ({ ...s, open: false }));
+
+  const updateDraft = (patch: Partial<ClientQuestion>) =>
+    setEditor((s) => ({ ...s, draft: { ...s.draft, ...patch } }));
+
+  const saveDraft = () => {
+    const draft = editor.draft;
+    if (!draft.text.trim()) {
+      toast({ title: "Question text is required", variant: "destructive" });
+      return;
+    }
+    if (wordCount(draft.text) > MAX_WORDS) {
+      toast({
+        title: `Question exceeds ${MAX_WORDS} words`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const isDuplicate = questions.some(
+      (q) =>
+        q.id !== draft.id &&
+        q.text.trim().toLowerCase() === draft.text.trim().toLowerCase(),
+    );
+    if (isDuplicate) {
+      toast({
+        title: "A question with this text already exists",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      draft.suggestedEnabled &&
+      (draft.inputType === "single_select" || draft.inputType === "multi_select") &&
+      draft.options.length === 0
+    ) {
+      toast({
+        title: "Add at least one option for select questions",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cleaned: ClientQuestion = {
+      ...draft,
+      // Picker types never need options — they're sourced from the DB
+      options:
+        draft.inputType === "client_picker" || draft.inputType === "poc_picker"
+          ? []
+          : Array.from(
+              new Set(draft.options.map((o) => o.trim()).filter(Boolean)),
+            ),
+      suggestedEnabled:
+        draft.inputType === "client_picker" || draft.inputType === "poc_picker"
+          ? false
+          : draft.suggestedEnabled,
+    };
+
+    setQuestions((prev) => {
+      if (editor.mode === "create") {
+        return [...prev, { ...cleaned, order: prev.length }];
+      }
+      return prev.map((q) => (q.id === cleaned.id ? cleaned : q));
+    });
+    toast({
+      title:
+        editor.mode === "create" ? "Question added" : "Question updated",
+    });
+    closeEditor();
+  };
+
+  const requestDelete = (ids: string[]) => {
+    if (ids.length === 0) return;
+    setConfirmDelete({ open: true, ids });
+  };
 
   const performDelete = () => {
-    if (confirmDelete.kind === "client" && confirmDelete.clientId) {
-      setClients((prev) => prev.filter((c) => c.id !== confirmDelete.clientId));
-      toast({ title: "Client deleted" });
-    } else if (
-      confirmDelete.kind === "poc" &&
-      confirmDelete.clientId &&
-      confirmDelete.pocId
-    ) {
-      setClients((prev) =>
-        prev.map((c) =>
-          c.id === confirmDelete.clientId
-            ? { ...c, pocs: c.pocs.filter((p) => p.id !== confirmDelete.pocId) }
-            : c,
-        ),
-      );
-      toast({ title: "POC deleted" });
-    }
-    setConfirmDelete({ open: false, kind: null, clientId: null, pocId: null });
+    setQuestions((prev) =>
+      prev
+        .filter((q) => !confirmDelete.ids.includes(q.id))
+        .map((q, i) => ({ ...q, order: i })),
+    );
+    setSelected((prev) => {
+      const next = new Set(prev);
+      confirmDelete.ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    toast({
+      title: `${confirmDelete.ids.length} question${
+        confirmDelete.ids.length > 1 ? "s" : ""
+      } deleted`,
+    });
+    setConfirmDelete({ open: false, ids: [] });
+  };
+
+  const toggleActive = (id: string) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, active: !q.active } : q)),
+    );
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setQuestions((prev) => {
+      const oldIndex = prev.findIndex((q) => q.id === active.id);
+      const newIndex = prev.findIndex((q) => q.id === over.id);
+      const moved = arrayMove(prev, oldIndex, newIndex);
+      return moved.map((q, i) => ({ ...q, order: i }));
+    });
   };
 
   return (
@@ -298,293 +355,154 @@ const ClientFieldsAdmin = () => {
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               <Building2 className="h-3.5 w-3.5" />
-              Directory
+              Chat Client Capture
             </div>
             <h1 className="mt-2 font-display text-3xl md:text-4xl font-bold tracking-tight">
-              Manage <span className="gradient-text">clients &amp; POCs</span>
+              Manage <span className="gradient-text">client questions</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Maintain your master directory of client companies and their
-              points of contact. Recruiters select from this list when creating
-              a job — no duplicate entry needed.
+              Configure the questions Glohire AI asks recruiters after a JD is
+              generated to capture client &amp; commercial details — bill rate,
+              payment type, contract type, and more. Clients and POCs are pulled
+              from your existing directory.
             </p>
           </div>
-          <Button variant="hero" onClick={openCreateClient}>
-            <Plus className="h-4 w-4" /> Add client
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {selected.size > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => requestDelete(Array.from(selected))}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete ({selected.size})
+              </Button>
+            )}
+            <Button variant="hero" size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              Add Question
+            </Button>
+          </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-3 gap-3">
-          <StatCard label="Total clients" value={clients.length} accent />
-          <StatCard label="Total POCs" value={totalPocs} />
+        {/* Stats */}
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Total questions" value={questions.length} />
           <StatCard
-            label="Avg POCs / client"
-            value={
-              clients.length === 0
-                ? 0
-                : Math.round((totalPocs / clients.length) * 10) / 10
-            }
+            label="Active"
+            value={questions.filter((q) => q.active).length}
+            accent
           />
+          <StatCard label="Clients in DB" value={clients.length} />
+          <StatCard label="POCs in DB" value={totalPocs} />
         </div>
 
-        <div className="mt-8 glass-card rounded-2xl p-3">
-          <div className="relative">
+        {/* Toolbar */}
+        <div className="mt-8 glass-card rounded-2xl p-3 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search clients, POCs, or emails..."
+              placeholder="Search client questions..."
               className="pl-9 bg-secondary/60 border-0 focus-visible:ring-1"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Filter:
+            </span>
+            {(["all", "active", "inactive"] as FilterStatus[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+                  filter === f
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-6 space-y-3">
-          {filtered.length === 0 ? (
-            <div className="glass-card rounded-2xl p-10 text-center">
-              <Building2 className="mx-auto h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                {clients.length === 0
-                  ? "No clients yet — add your first one to get started."
-                  : "No results match your search."}
-              </p>
-            </div>
+        {/* Select-all bar */}
+        {visible.length > 0 && (
+          <div className="mt-4 flex items-center gap-3 px-4 text-xs text-muted-foreground">
+            <Checkbox
+              checked={allVisibleSelected}
+              onCheckedChange={toggleSelectAll}
+              aria-label="Select all"
+            />
+            <span>
+              {selected.size > 0
+                ? `${selected.size} selected`
+                : `${visible.length} question${visible.length > 1 ? "s" : ""}`}
+            </span>
+            <span className="ml-auto flex items-center gap-1.5">
+              <GripVertical className="h-3.5 w-3.5" />
+              Drag to reorder
+            </span>
+          </div>
+        )}
+
+        {/* Questions list */}
+        <div className="mt-3">
+          {visible.length === 0 ? (
+            <EmptyState
+              onAdd={openCreate}
+              hasFilter={!!search || filter !== "all"}
+            />
           ) : (
-            filtered.map((c) => (
-              <ClientCard
-                key={c.id}
-                client={c}
-                expanded={expanded.has(c.id)}
-                onToggle={() => toggleExpand(c.id)}
-                onEdit={() => openEditClient(c)}
-                onDelete={() => deleteClient(c.id)}
-                onAddPoc={() => openCreatePoc(c.id)}
-                onEditPoc={(p) => openEditPoc(c.id, p)}
-                onDeletePoc={(p) => deletePoc(c.id, p.id)}
-              />
-            ))
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={visible.map((q) => q.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="space-y-3">
+                  {visible.map((q, i) => (
+                    <SortableRow
+                      key={q.id}
+                      question={q}
+                      index={i}
+                      selected={selected.has(q.id)}
+                      onSelect={() => toggleSelect(q.id)}
+                      onEdit={() => openEdit(q)}
+                      onDelete={() => requestDelete([q.id])}
+                      onToggleActive={() => toggleActive(q.id)}
+                      questions={questions}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
+
+        <p className="mt-10 text-center text-xs text-muted-foreground">
+          Changes apply only to new chat sessions. Active job creation chats
+          continue with their existing question set.
+        </p>
       </main>
 
-      {/* Client editor */}
-      <Dialog
-        open={clientEditor.open}
-        onOpenChange={(o) => setClientEditor((s) => ({ ...s, open: o }))}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {clientEditor.mode === "create" ? "Add client" : "Edit client"}
-            </DialogTitle>
-            <DialogDescription>
-              Company-level details. POCs are managed separately under each
-              client.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="cl-name">
-                Client / Company name
-                <span className="text-destructive ml-0.5">*</span>
-              </Label>
-              <Input
-                id="cl-name"
-                value={clientEditor.draft.name}
-                onChange={(e) =>
-                  setClientEditor((s) => ({
-                    ...s,
-                    draft: { ...s.draft, name: e.target.value },
-                  }))
-                }
-                placeholder="e.g. Acme Inc."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Industry</Label>
-                <Select
-                  value={clientEditor.draft.industry || ""}
-                  onValueChange={(v) =>
-                    setClientEditor((s) => ({
-                      ...s,
-                      draft: { ...s.draft, industry: v },
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {industryOptions.map((o) => (
-                      <SelectItem key={o} value={o}>
-                        {o}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cl-loc">Location</Label>
-                <Input
-                  id="cl-loc"
-                  value={clientEditor.draft.location || ""}
-                  onChange={(e) =>
-                    setClientEditor((s) => ({
-                      ...s,
-                      draft: { ...s.draft, location: e.target.value },
-                    }))
-                  }
-                  placeholder="e.g. New York, NY"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cl-web">Website</Label>
-              <Input
-                id="cl-web"
-                type="url"
-                value={clientEditor.draft.website || ""}
-                onChange={(e) =>
-                  setClientEditor((s) => ({
-                    ...s,
-                    draft: { ...s.draft, website: e.target.value },
-                  }))
-                }
-                placeholder="https://acme.com"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setClientEditor((s) => ({ ...s, open: false }))}
-            >
-              Cancel
-            </Button>
-            <Button variant="hero" onClick={saveClient}>
-              {clientEditor.mode === "create" ? "Add client" : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Editor Modal */}
+      <QuestionEditor
+        state={editor}
+        questions={questions}
+        onClose={closeEditor}
+        onSave={saveDraft}
+        onChange={updateDraft}
+      />
 
-      {/* POC editor */}
-      <Dialog
-        open={pocEditor.open}
-        onOpenChange={(o) => setPocEditor((s) => ({ ...s, open: o }))}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {pocEditor.mode === "create"
-                ? "Add point of contact"
-                : "Edit point of contact"}
-            </DialogTitle>
-            <DialogDescription>
-              Contact details for this client. Recruiters will choose this
-              person when assigning a job.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="poc-name">
-                  Full name
-                  <span className="text-destructive ml-0.5">*</span>
-                </Label>
-                <Input
-                  id="poc-name"
-                  value={pocEditor.draft.name}
-                  onChange={(e) =>
-                    setPocEditor((s) => ({
-                      ...s,
-                      draft: { ...s.draft, name: e.target.value },
-                    }))
-                  }
-                  placeholder="e.g. Sarah Johnson"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="poc-desig">Designation</Label>
-                <Input
-                  id="poc-desig"
-                  value={pocEditor.draft.designation || ""}
-                  onChange={(e) =>
-                    setPocEditor((s) => ({
-                      ...s,
-                      draft: { ...s.draft, designation: e.target.value },
-                    }))
-                  }
-                  placeholder="e.g. Talent Acquisition Lead"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="poc-email">
-                  Email
-                  <span className="text-destructive ml-0.5">*</span>
-                </Label>
-                <Input
-                  id="poc-email"
-                  type="email"
-                  value={pocEditor.draft.email}
-                  onChange={(e) =>
-                    setPocEditor((s) => ({
-                      ...s,
-                      draft: { ...s.draft, email: e.target.value },
-                    }))
-                  }
-                  placeholder="name@company.com"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="poc-phone">Phone</Label>
-                <Input
-                  id="poc-phone"
-                  type="tel"
-                  value={pocEditor.draft.phone || ""}
-                  onChange={(e) =>
-                    setPocEditor((s) => ({
-                      ...s,
-                      draft: { ...s.draft, phone: e.target.value },
-                    }))
-                  }
-                  placeholder="+1 555 123 4567"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="poc-notes">Internal notes</Label>
-              <Textarea
-                id="poc-notes"
-                value={pocEditor.draft.notes || ""}
-                onChange={(e) =>
-                  setPocEditor((s) => ({
-                    ...s,
-                    draft: { ...s.draft, notes: e.target.value },
-                  }))
-                }
-                placeholder="Preferred channel, timezone, etc."
-                className="min-h-[80px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setPocEditor((s) => ({ ...s, open: false }))}
-            >
-              Cancel
-            </Button>
-            <Button variant="hero" onClick={savePoc}>
-              {pocEditor.mode === "create" ? "Add POC" : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {/* Delete confirmation */}
       <AlertDialog
         open={confirmDelete.open}
         onOpenChange={(o) =>
@@ -594,14 +512,14 @@ const ClientFieldsAdmin = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmDelete.kind === "client"
-                ? "Delete client?"
-                : "Delete POC?"}
+              Delete {confirmDelete.ids.length > 1 ? "questions" : "question"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDelete.kind === "client"
-                ? "This will remove the client and all of its POCs from the directory."
-                : "This will remove the POC from this client."}
+              This action cannot be undone. The chat flow will skip{" "}
+              {confirmDelete.ids.length > 1
+                ? "these questions"
+                : "this question"}{" "}
+              for new sessions. Historical job records remain unaffected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -642,168 +560,736 @@ const StatCard = ({
   </div>
 );
 
-const ClientCard = ({
-  client,
-  expanded,
-  onToggle,
+const EmptyState = ({
+  onAdd,
+  hasFilter,
+}: {
+  onAdd: () => void;
+  hasFilter: boolean;
+}) => (
+  <div className="glass-card rounded-2xl p-12 text-center">
+    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <Building2 className="h-6 w-6" />
+    </div>
+    <h3 className="mt-4 font-display text-lg font-semibold">
+      {hasFilter ? "No questions match your filter" : "No client questions yet"}
+    </h3>
+    <p className="mt-1 text-sm text-muted-foreground">
+      {hasFilter
+        ? "Try clearing the search or status filter."
+        : "Add your first question to start capturing client details after JD generation."}
+    </p>
+    {!hasFilter && (
+      <Button variant="hero" size="sm" className="mt-6" onClick={onAdd}>
+        <Plus className="h-4 w-4" />
+        Add Question
+      </Button>
+    )}
+  </div>
+);
+
+const SortableRow = ({
+  question,
+  index,
+  selected,
+  onSelect,
   onEdit,
   onDelete,
-  onAddPoc,
-  onEditPoc,
-  onDeletePoc,
+  onToggleActive,
+  questions,
 }: {
-  client: Client;
-  expanded: boolean;
-  onToggle: () => void;
+  question: ClientQuestion;
+  index: number;
+  selected: boolean;
+  onSelect: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onAddPoc: () => void;
-  onEditPoc: (p: POC) => void;
-  onDeletePoc: (p: POC) => void;
-}) => (
-  <div className="glass-card rounded-2xl overflow-hidden">
-    <div className="flex items-center gap-3 p-4">
-      <button
-        onClick={onToggle}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-        aria-label={expanded ? "Collapse" : "Expand"}
-      >
-        {expanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-      </button>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Building2 className="h-5 w-5" />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-display text-base font-semibold truncate">
-            {client.name}
-          </h3>
-          {client.industry && (
-            <Badge variant="secondary" className="text-[10px]">
-              {client.industry}
-            </Badge>
-          )}
-          <Badge variant="outline" className="text-[10px] gap-1">
-            <UserRound className="h-3 w-3" />
-            {client.pocs.length} POC{client.pocs.length === 1 ? "" : "s"}
-          </Badge>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {client.location && (
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {client.location}
-            </span>
-          )}
-          {client.website && (
-            <a
-              href={client.website}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 hover:text-primary"
-            >
-              <Globe className="h-3 w-3" />
-              {client.website.replace(/^https?:\/\//, "")}
-            </a>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" onClick={onEdit}>
-          <Pencil className="h-3.5 w-3.5" /> Edit
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
+  onToggleActive: () => void;
+  questions: ClientQuestion[];
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id });
 
-    {expanded && (
-      <div className="border-t border-border/60 bg-secondary/30 px-4 py-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Points of Contact
-          </h4>
-          <Button variant="outline" size="sm" onClick={onAddPoc}>
-            <Plus className="h-3.5 w-3.5" /> Add POC
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 20 : "auto",
+  };
+
+  const conditionLabel = (c: ClientCondition) => {
+    const ifQ = questions.find((q) => q.id === c.ifQuestionId);
+    const thenQ = questions.find((q) => q.id === c.thenQuestionId);
+    return `IF "${ifQ?.text.slice(0, 30) ?? "?"}…" ${c.operator} "${
+      c.value
+    }" → "${thenQ?.text.slice(0, 30) ?? "?"}…"`;
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`glass-card rounded-2xl transition-all ${
+        selected ? "ring-1 ring-primary" : ""
+      } ${isDragging ? "shadow-elegant" : ""}`}
+    >
+      <div className="flex items-start gap-3 p-4">
+        <button
+          {...attributes}
+          {...listeners}
+          className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onSelect}
+          className="mt-1"
+          aria-label={`Select question ${index + 1}`}
+        />
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2 flex-wrap">
+            <span className="inline-flex items-center justify-center min-w-7 h-6 px-1.5 rounded-md bg-secondary text-xs font-mono text-muted-foreground">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <p className="font-medium text-sm md:text-base flex-1 min-w-0 break-words">
+              {question.text}
+            </p>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="gap-1.5 text-xs">
+              {inputTypeLabel[question.inputType]}
+            </Badge>
+            {question.required && (
+              <Badge variant="outline" className="text-xs">
+                Required
+              </Badge>
+            )}
+            {(question.inputType === "client_picker" ||
+              question.inputType === "poc_picker") && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1.5 border-accent/40 text-accent"
+              >
+                <Building2 className="h-3 w-3" />
+                From DB
+              </Badge>
+            )}
+            {question.suggestedEnabled && question.options.length > 0 && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1.5 border-primary/40 text-primary"
+              >
+                <Sparkles className="h-3 w-3" />
+                {question.options.length} suggestion
+                {question.options.length > 1 ? "s" : ""}
+              </Badge>
+            )}
+            {question.conditions.length > 0 && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1.5 border-accent/40 text-accent"
+              >
+                <GitBranch className="h-3 w-3" />
+                {question.conditions.length} condition
+                {question.conditions.length > 1 ? "s" : ""}
+              </Badge>
+            )}
+            <button
+              onClick={() => setExpanded((s) => !s)}
+              className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              {expanded ? "Hide" : "Preview"}
+              {expanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onToggleActive}
+            className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              question.active
+                ? "bg-primary/10 text-primary hover:bg-primary/15"
+                : "bg-muted text-muted-foreground hover:bg-secondary"
+            }`}
+            aria-label={question.active ? "Deactivate" : "Activate"}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                question.active ? "bg-primary" : "bg-muted-foreground"
+              }`}
+            />
+            {question.active ? "Active" : "Inactive"}
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onEdit}
+            aria-label="Edit"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            aria-label="Delete"
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-        {client.pocs.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-3 text-center">
-            No POCs yet for this client.
-          </p>
-        ) : (
-          <div className="grid gap-2 md:grid-cols-2">
-            {client.pocs.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-xl border border-border/60 bg-background/60 p-3"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
-                        <UserRound className="h-3.5 w-3.5" />
-                      </span>
-                      <p className="text-sm font-medium truncate">{p.name}</p>
-                    </div>
-                    {p.designation && (
-                      <p className="mt-0.5 ml-8 text-xs text-muted-foreground truncate">
-                        {p.designation}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={() => onEditPoc(p)}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={() => onDeletePoc(p)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-2 ml-8 space-y-1 text-xs text-muted-foreground">
-                  <div className="inline-flex items-center gap-1.5">
-                    <Mail className="h-3 w-3" />
-                    <span className="truncate">{p.email}</span>
-                  </div>
-                  {p.phone && (
-                    <div className="inline-flex items-center gap-1.5 ml-3">
-                      <Phone className="h-3 w-3" />
-                      {p.phone}
-                    </div>
-                  )}
-                </div>
-                {p.notes && (
-                  <p className="mt-2 ml-8 text-[11px] italic text-muted-foreground line-clamp-2">
-                    {p.notes}
+      </div>
+
+      {expanded && (
+        <div className="border-t border-border px-4 py-4 bg-secondary/30 rounded-b-2xl space-y-4">
+          {(question.inputType === "client_picker" ||
+            question.inputType === "poc_picker") && (
+            <div className="text-xs text-muted-foreground">
+              {question.inputType === "client_picker"
+                ? "Recruiter selects a client from the existing directory."
+                : "Recruiter selects a POC, filtered by the chosen client earlier in the questionnaire."}
+            </div>
+          )}
+          {question.suggestedEnabled && question.options.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Options
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {question.options.map((o) => (
+                  <span
+                    key={o}
+                    className="px-3 py-1.5 rounded-full bg-background border border-border text-xs"
+                  >
+                    {o}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {question.conditions.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Conditional logic
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {question.conditions.map((c) => (
+                  <li
+                    key={c.id}
+                    className="text-xs px-3 py-2 rounded-lg bg-background border border-border font-mono"
+                  >
+                    {conditionLabel(c)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex md:hidden">
+            <button
+              onClick={onToggleActive}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+                question.active
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  question.active ? "bg-primary" : "bg-muted-foreground"
+                }`}
+              />
+              {question.active ? "Active" : "Inactive"}
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+};
+
+const QuestionEditor = ({
+  state,
+  questions,
+  onClose,
+  onSave,
+  onChange,
+}: {
+  state: EditorState;
+  questions: ClientQuestion[];
+  onClose: () => void;
+  onSave: () => void;
+  onChange: (patch: Partial<ClientQuestion>) => void;
+}) => {
+  const { draft } = state;
+  const [newOption, setNewOption] = useState("");
+  const words = wordCount(draft.text);
+  const overLimit = words > MAX_WORDS;
+  const isPicker =
+    draft.inputType === "client_picker" || draft.inputType === "poc_picker";
+  const isSelect =
+    draft.inputType === "single_select" || draft.inputType === "multi_select";
+
+  const addOption = (val: string) => {
+    const v = val.trim();
+    if (!v) return;
+    if (draft.options.length >= MAX_OPTIONS) {
+      toast({
+        title: `Maximum ${MAX_OPTIONS} options allowed`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (draft.options.some((o) => o.toLowerCase() === v.toLowerCase())) {
+      toast({ title: "Duplicate option", variant: "destructive" });
+      return;
+    }
+    onChange({ options: [...draft.options, v] });
+    setNewOption("");
+  };
+
+  const removeOption = (idx: number) =>
+    onChange({ options: draft.options.filter((_, i) => i !== idx) });
+
+  const updateOption = (idx: number, val: string) =>
+    onChange({
+      options: draft.options.map((o, i) => (i === idx ? val : o)),
+    });
+
+  const generateAI = () => {
+    if (!draft.text.trim()) {
+      toast({
+        title: "Add question text first",
+        description: "AI uses your question to generate relevant suggestions.",
+      });
+      return;
+    }
+    const generated = aiGenerateClientOptions(draft.text).slice(
+      0,
+      MAX_AI_OPTIONS,
+    );
+    const merged = Array.from(
+      new Set([...draft.options, ...generated].map((o) => o.trim())),
+    ).slice(0, MAX_OPTIONS);
+    onChange({ options: merged, suggestedEnabled: true });
+    toast({
+      title: "AI generated suggestions",
+      description: `Added ${merged.length - draft.options.length} new option${
+        merged.length - draft.options.length === 1 ? "" : "s"
+      }.`,
+    });
+  };
+
+  const addCondition = () => {
+    const otherQs = questions.filter((q) => q.id !== draft.id);
+    if (otherQs.length < 1) {
+      toast({ title: "Need at least one other question to add a condition" });
+      return;
+    }
+    const cond: ClientCondition = {
+      id: `c-${uid()}`,
+      ifQuestionId: otherQs[0].id,
+      operator: "equals",
+      value: otherQs[0].options[0] ?? "",
+      thenQuestionId: draft.id,
+    };
+    onChange({ conditions: [...draft.conditions, cond] });
+  };
+
+  const updateCondition = (id: string, patch: Partial<ClientCondition>) =>
+    onChange({
+      conditions: draft.conditions.map((c) =>
+        c.id === id ? { ...c, ...patch } : c,
+      ),
+    });
+
+  const removeCondition = (id: string) =>
+    onChange({
+      conditions: draft.conditions.filter((c) => c.id !== id),
+    });
+
+  const otherQuestions = questions.filter((q) => q.id !== draft.id);
+
+  return (
+    <Dialog open={state.open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">
+            {state.mode === "create" ? "Add new question" : "Edit question"}
+          </DialogTitle>
+          <DialogDescription>
+            Configure how Glohire AI asks this question during the post-JD
+            client capture step.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs defaultValue="basics" className="mt-2">
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="basics">Basics</TabsTrigger>
+            <TabsTrigger value="answers">
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              Answers
+            </TabsTrigger>
+            <TabsTrigger value="logic">
+              <GitBranch className="h-3.5 w-3.5 mr-1.5" />
+              Logic
+            </TabsTrigger>
+          </TabsList>
+
+          {/* BASICS */}
+          <TabsContent value="basics" className="space-y-5 pt-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cq-text">Question text</Label>
+                <span
+                  className={`text-xs ${
+                    overLimit ? "text-destructive" : "text-muted-foreground"
+                  }`}
+                >
+                  {words}/{MAX_WORDS} words
+                </span>
+              </div>
+              <Textarea
+                id="cq-text"
+                value={draft.text}
+                onChange={(e) => onChange({ text: e.target.value })}
+                placeholder="e.g. What is the client bill rate?"
+                className="min-h-[88px]"
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Input type</Label>
+                <Select
+                  value={draft.inputType}
+                  onValueChange={(v) =>
+                    onChange({ inputType: v as ClientInputType })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free_text">Free text</SelectItem>
+                    <SelectItem value="single_select">Single select</SelectItem>
+                    <SelectItem value="multi_select">Multi select</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="currency">Currency</SelectItem>
+                    <SelectItem value="client_picker">
+                      Client (from DB)
+                    </SelectItem>
+                    <SelectItem value="poc_picker">POC (from DB)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isPicker && (
+                  <p className="text-xs text-muted-foreground">
+                    Recruiter picks from your existing client / POC directory —
+                    no manual entry.
                   </p>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )}
+
+              <div className="space-y-3 pt-1">
+                <ToggleRow
+                  label="Required"
+                  description="Recruiter must answer before continuing."
+                  checked={draft.required}
+                  onChange={(v) => onChange({ required: v })}
+                />
+                <ToggleRow
+                  label="Active"
+                  description="Show in chat flow."
+                  checked={draft.active}
+                  onChange={(v) => onChange({ active: v })}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ANSWERS */}
+          <TabsContent value="answers" className="space-y-5 pt-4">
+            {isPicker ? (
+              <div className="rounded-xl bg-secondary/40 border border-border p-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 mb-2 text-foreground font-medium">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Sourced from your directory
+                </div>
+                {draft.inputType === "client_picker"
+                  ? "The recruiter will see a searchable list of all clients already in your directory."
+                  : "The recruiter will see POCs filtered by whichever client they selected earlier in this questionnaire."}
+              </div>
+            ) : (
+              <>
+                <ToggleRow
+                  label={
+                    isSelect
+                      ? "Configure options"
+                      : "Enable suggested answers"
+                  }
+                  description={
+                    isSelect
+                      ? "Options shown as buttons. Required for select questions."
+                      : "Show pre-defined options as buttons in the chat."
+                  }
+                  checked={draft.suggestedEnabled || isSelect}
+                  onChange={(v) =>
+                    onChange({ suggestedEnabled: isSelect ? true : v })
+                  }
+                />
+
+                {(draft.suggestedEnabled || isSelect) && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={generateAI}
+                        className="gap-1.5"
+                      >
+                        <Zap className="h-3.5 w-3.5" />
+                        Generate with AI
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {draft.options.length}/{MAX_OPTIONS} options
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {draft.options.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 rounded-lg bg-secondary/40 px-2 py-1"
+                        >
+                          <span className="text-xs font-mono text-muted-foreground w-6 text-center">
+                            {idx + 1}
+                          </span>
+                          <Input
+                            value={opt}
+                            onChange={(e) => updateOption(idx, e.target.value)}
+                            className="border-0 bg-transparent focus-visible:ring-0 h-9"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeOption(idx)}
+                            aria-label="Remove option"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        addOption(newOption);
+                      }}
+                      className="flex gap-2"
+                    >
+                      <Input
+                        value={newOption}
+                        onChange={(e) => setNewOption(e.target.value)}
+                        placeholder="Type an option and press Enter"
+                      />
+                      <Button type="submit" variant="outline" size="sm">
+                        <Plus className="h-4 w-4" />
+                        Add
+                      </Button>
+                    </form>
+
+                    {draft.options.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No options yet. Add manually or use AI to generate
+                        suggestions.
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* LOGIC */}
+          <TabsContent value="logic" className="space-y-4 pt-4">
+            <div className="rounded-xl bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
+              Conditional logic shows this question only when the recruiter's
+              prior answer matches a condition. Define one or more rules below.
+            </div>
+
+            <div className="space-y-3">
+              {draft.conditions.map((c) => {
+                const ifQ = otherQuestions.find((q) => q.id === c.ifQuestionId);
+                const valueOptions = ifQ?.options ?? [];
+                return (
+                  <div
+                    key={c.id}
+                    className="rounded-xl border border-border bg-background p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-primary">
+                        Condition
+                      </span>
+                      <button
+                        onClick={() => removeCondition(c.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Remove condition"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid sm:grid-cols-12 gap-2 items-center">
+                      <span className="sm:col-span-1 text-xs font-semibold text-muted-foreground">
+                        IF
+                      </span>
+                      <div className="sm:col-span-5">
+                        <Select
+                          value={c.ifQuestionId}
+                          onValueChange={(v) =>
+                            updateCondition(c.id, {
+                              ifQuestionId: v,
+                              value: "",
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Question" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {otherQuestions.map((q) => (
+                              <SelectItem key={q.id} value={q.id}>
+                                {q.text.slice(0, 50)}
+                                {q.text.length > 50 ? "…" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Select
+                          value={c.operator}
+                          onValueChange={(v) =>
+                            updateCondition(c.id, {
+                              operator: v as ClientCondition["operator"],
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="equals">equals</SelectItem>
+                            <SelectItem value="contains">contains</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-4">
+                        {valueOptions.length > 0 ? (
+                          <Select
+                            value={c.value}
+                            onValueChange={(v) =>
+                              updateCondition(c.id, { value: v })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Value" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {valueOptions.map((o) => (
+                                <SelectItem key={o} value={o}>
+                                  {o}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            value={c.value}
+                            onChange={(e) =>
+                              updateCondition(c.id, { value: e.target.value })
+                            }
+                            placeholder="Value"
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                      <ChevronRight className="h-3 w-3" />
+                      THEN show this question
+                      <Check className="h-3 w-3 text-primary" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addCondition}
+              disabled={otherQuestions.length === 0}
+            >
+              <Plus className="h-4 w-4" />
+              Add condition
+            </Button>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="hero"
+            onClick={onSave}
+            disabled={!draft.text.trim() || overLimit}
+          >
+            {state.mode === "create" ? "Create question" : "Save changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const ToggleRow = ({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) => (
+  <div className="flex items-start justify-between gap-4 rounded-lg bg-secondary/40 px-3 py-2">
+    <div>
+      <div className="text-sm font-medium">{label}</div>
+      <div className="text-xs text-muted-foreground">{description}</div>
+    </div>
+    <Switch checked={checked} onCheckedChange={onChange} />
   </div>
 );
 
