@@ -27,7 +27,7 @@ export const SectionSwitcher = ({
       }`}
     >
       <Building2 className="h-3.5 w-3.5" />
-      Clients &amp; POCs
+      Client questions
     </Link>
   </div>
 );
