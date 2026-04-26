@@ -322,7 +322,7 @@ const CreateJob = () => {
     ]);
     setMultiPick([]);
     setTextInput("");
-  }, [currentJobQuestion, askedIds, answers, questions, phase, clients.length]);
+  }, [currentJobQuestion, askedIds, answers, questions, phase, clients.length, mode]);
 
   // Push the next CLIENT question into chat
   useEffect(() => {
