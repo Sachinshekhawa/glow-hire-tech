@@ -1078,6 +1078,7 @@ const CreateJob = () => {
             </Card>
           </aside>
         </div>
+        )}
       </main>
 
       {/* Edit JOB answer */}
