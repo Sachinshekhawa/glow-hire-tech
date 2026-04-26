@@ -484,6 +484,11 @@ const CreateJob = () => {
       next.delete(qid);
       return next;
     });
+    // Don't auto-rebuild a JD that came from an uploaded/pasted source
+    if (jdOverride) {
+      toast({ title: "Answer updated" });
+      return;
+    }
     setMessages((prev) => {
       const idx = [...prev].reverse().findIndex((m) => (m as any).kind === "jd");
       if (idx === -1) return prev;
