@@ -215,6 +215,8 @@ const CreateJob = () => {
   const [editingId, setEditingId] = useState<string | null>(null); // job-question edit
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [autoFilledIds, setAutoFilledIds] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<CreateMode | "select">("select");
+  const [jdOverride, setJdOverride] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Eligible job-question pipeline
