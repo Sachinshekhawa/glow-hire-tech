@@ -744,12 +744,24 @@ const CreateJob = () => {
                   Create a Job
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Chat with Glohire AI to generate a JD
+                  {mode === "select"
+                    ? "Pick how you'd like to create this job"
+                    : mode === "prompt"
+                      ? "Prompt-based job creation"
+                      : mode === "upload"
+                        ? "Upload or paste a JD"
+                        : "Chat with Glohire AI to generate a JD"}
                 </p>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {mode !== "select" && phase === "job" && !completed && (
+              <Button variant="ghost" size="sm" onClick={changeMode}>
+                <ArrowLeft className="h-4 w-4" />
+                Change mode
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/system-behavior">
                 <Settings2 className="h-4 w-4" />
