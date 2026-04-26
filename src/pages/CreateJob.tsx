@@ -262,8 +262,9 @@ const CreateJob = () => {
 
   const jobPhaseDone = phase === "job" && currentJobQuestion == null;
 
-  // Initial greeting
+  // Initial greeting (only relevant for chat mode)
   useEffect(() => {
+    if (mode !== "chat") return;
     if (messages.length === 0) {
       const intro: ChatMessage = {
         id: uid(),
@@ -275,7 +276,7 @@ const CreateJob = () => {
       setMessages([intro]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mode]);
 
   // Push the next JOB question into chat
   useEffect(() => {
