@@ -54,6 +54,9 @@ import {
   ClientQuestion,
 } from "@/data/clientQuestions";
 import { loadClientQuestions } from "@/data/clientQuestionsStore";
+import { ModeSelect, type CreateMode } from "@/components/createjob/ModeSelect";
+import { PromptMode } from "@/components/createjob/PromptMode";
+import { UploadMode } from "@/components/createjob/UploadMode";
 
 type Phase = "job" | "client";
 
