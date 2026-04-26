@@ -1,70 +1,101 @@
-
-
 ## Goal
 
-Reshape the **Admin → Clients & POCs** section so it no longer manages client/POC records (those come from the DB). Instead, it manages a configurable **Client Questionnaire** — the same admin pattern already used for chat-based job creation questions, but applied to client-level data captured per job (Client name, attached POC, Bill rate, Payment type, etc.).
+Before the existing chat-based job creation runs, present the recruiter with a **mode picker** offering three ways to create a job:
 
-The recruiter flow after JD generation will then ask these admin-defined questions in a chat-like step, with Client and POC pulled from the existing directory (read-only DB list).
+1. **Chat-based** — current step-by-step Q&A flow (unchanged).
+2. **Prompt-based** — recruiter writes one prompt describing the role; the system parses it into the same answer schema and generates the JD.
+3. **Upload file** — recruiter uploads a JD (PDF / Word / Audio) **or** pastes copied content; the system extracts text and generates the JD.
 
----
-
-## Changes
-
-### 1. Admin page becomes a Client-Question manager
-Replace `src/pages/ClientFieldsAdmin.tsx` with a question-management UI mirroring `SystemBehavior.tsx`:
-
-- Rename route label to **"Client Questions"** (keep `/admin/client-fields` route to avoid breakage).
-- Remove all "Add client", "Edit client", "Add POC" UI.
-- Show a list of client questions with the same controls as job questions:
-  - Text, input type, active toggle, required toggle, order (drag handle), conditions, suggested options.
-- Special input types tailored to client data:
-  - `client_picker` — select from existing DB clients (read-only list from `clientsStore`)
-  - `poc_picker` — select POC, filtered by chosen client (depends on a prior `client_picker` answer)
-  - `single_select`, `multi_select`, `free_text`, `number`, `currency` (for Bill rate)
-- Seed questions: Client Name (`client_picker`, required), Attached POC (`poc_picker`, required), Bill Rate (`currency`), Payment Type (`single_select`: Hourly / Monthly / Fixed / Milestone), Payment Terms (`single_select`: Net 15 / Net 30 / Net 45 / Net 60), Contract Type (`single_select`: C2C / W2 / 1099 / Full-time), Start Date (`free_text`), Notes (`free_text`).
-
-### 2. New data layer for client questions
-- `src/data/clientQuestions.ts` — types (`ClientQuestion`, extended `InputType`), seed questions, AI suggestion helper.
-- `src/data/clientQuestionsStore.ts` — `localStorage` persistence (mirrors `chatQuestionsStore.ts`).
-- Keep `src/data/clients.ts` + `clientsStore.ts` as the **read-only DB source** for `client_picker`/`poc_picker`. No admin CRUD on these.
-
-### 3. Recruiter flow: client questionnaire after JD
-Update `src/pages/CreateJob.tsx`:
-- After JD is generated, replace the current "Select Client / Select POC" cards with a **second chat phase** driven by active client questions.
-- Same chat UX as job questions (pills, multi-select chips, free text, AI auto-extract via existing `answerExtractor` where applicable).
-- `client_picker` renders a searchable list of existing clients from `clientsStore`.
-- `poc_picker` renders POCs filtered by the selected client.
-- Live summary card on the side (matching the job-question summary) with edit support per answered question.
-- "Download internal sheet" exports the answered client questionnaire (not part of the JD markdown).
-
-### 4. Shared admin nav
-Update `src/pages/ClientFieldsAdmin.shared.tsx` label from "Clients & POCs" → **"Client Questions"** so the switcher in both admin pages reflects the new purpose.
+After any of the three modes produces a JD, the flow continues into the existing **Client & Commercial questionnaire** phase (no change there).
 
 ---
 
-## Technical notes
+## UX flow
 
-- Reuse the existing admin question component patterns from `SystemBehavior.tsx` (drag-and-drop via `dnd-kit`, condition builder, suggested-options editor) — extract a shared `<QuestionBoard>` component if it keeps both pages thin; otherwise duplicate the structure for clarity.
-- Conditions support cross-question branching within the client questionnaire (e.g., show "Milestone schedule" only if Payment Type = Milestone).
-- The `poc_picker` question implicitly depends on whichever `client_picker` answer was given earlier in the same questionnaire — resolved at runtime by reading prior answers, no manual condition needed.
-- All persistence stays in `localStorage` (consistent with current mock setup); swapping to Supabase later is a drop-in for the store files.
-- No changes to the JD generator — client answers are stored separately and only included in the internal-sheet export.
+`/create-job` will start on a new **Mode Selection** screen (no chat yet). Three large cards:
+
+| Card | Icon | Subtitle |
+|---|---|---|
+| Chat with AI | `MessagesSquare` | Answer a few quick questions |
+| Write a prompt | `Sparkles` | Describe the role in your own words |
+| Upload / paste JD | `Upload` | PDF, Word, audio, or paste text |
+
+Selecting a card advances to that mode. A "← Change mode" link in the header lets the user reset before the JD is generated.
+
+### Mode 1 — Chat (existing)
+No functional change. Just rendered when `mode === 'chat'`.
+
+### Mode 2 — Prompt
+- Single large `Textarea` ("e.g. *Senior Java developer, full-time, Bangalore, 2 openings, must know Spring & Kubernetes…*") + **Generate JD** button.
+- On submit:
+  1. Run the existing `extractAnswersFromText` against **all** active job questions (passing `currentQuestionId = null` so it considers every question).
+  2. Apply extracted answers to the `answers` state.
+  3. For any *required* question that wasn't extracted, fall back to a brief inline review panel listing those gaps as small inputs/pickers — user fills them and clicks **Generate JD**.
+  4. Build the JD via existing `buildJD(...)` and transition into the **client phase** exactly like the chat flow does today.
+- The same **Live Summary** sidebar with edit support is shown so the user can correct any auto-extracted answer before/after JD generation (reuses existing `EditAnswerDialog`).
+
+### Mode 3 — Upload / Paste
+- Tabbed area: **Upload file** | **Paste text**.
+- **Upload tab**: drag-and-drop / file picker accepting `.pdf, .doc, .docx, .txt, .mp3, .wav, .m4a`.
+  - Client-side text extraction:
+    - `.txt` → read as text directly.
+    - `.pdf` → use `pdfjs-dist` (already a common Vite-friendly lib; we'll add it).
+    - `.docx` → use `mammoth` (browser build) to extract raw text.
+    - `.doc` (legacy) and audio files → show a friendly message: "Audio/legacy `.doc` parsing isn't supported in the browser yet — please paste the text or upload as PDF/DOCX." (audio transcription would need a backend; out of scope for this mock).
+  - Show file name, size, and a small "Remove" button after selection.
+- **Paste tab**: large `Textarea` for raw pasted JD content.
+- **Use this JD** button:
+  1. Take the extracted/pasted text as the **JD body**.
+  2. Run `extractAnswersFromText` to populate `answers` so downstream client phase + Live Summary still work and the JD is editable.
+  3. Use the pasted text as the JD output **directly** (skip `buildJD`) — but offer a "Regenerate from extracted fields" toggle in the JD card for users who want the templated version.
+  4. Transition into the **client phase**.
+
+### After JD generation (all modes)
+Same as today: client questionnaire chat → final summary → download internal sheet. No changes to that section.
 
 ---
 
-## Files
+## Implementation
 
-**Created**
-- `src/data/clientQuestions.ts`
-- `src/data/clientQuestionsStore.ts`
-
-**Rewritten**
-- `src/pages/ClientFieldsAdmin.tsx` (now a question manager, no client/POC CRUD)
+### Files
 
 **Edited**
-- `src/pages/CreateJob.tsx` (replace selector cards with chat-driven client questionnaire)
-- `src/pages/ClientFieldsAdmin.shared.tsx` (rename label)
+- `src/pages/CreateJob.tsx` — add `mode` state (`'select' | 'chat' | 'prompt' | 'upload'`), render mode picker when `mode === 'select'`, render new `PromptMode` and `UploadMode` panels for the other two; existing chat UI runs only when `mode === 'chat'`. Hoist `answers`, `clientAnswers`, JD state, and the client-phase chat into the parent so all three modes share the same downstream flow.
+- `src/data/answerExtractor.ts` — extend so `currentQuestionId` can be `null` (it already accepts `string | null`, just confirm) and tighten heuristics for free-text job-title capture from longer paragraphs (used by both prompt + upload modes).
 
-**Unchanged but referenced**
-- `src/data/clients.ts`, `src/data/clientsStore.ts` — used read-only as the DB source for client/POC pickers.
+**Created**
+- `src/components/createjob/ModeSelect.tsx` — the three-card picker.
+- `src/components/createjob/PromptMode.tsx` — prompt textarea, gap-filler review, generate button.
+- `src/components/createjob/UploadMode.tsx` — upload + paste tabs, file parsing, "Use this JD" button.
+- `src/lib/jdFileParser.ts` — async `extractTextFromFile(file: File): Promise<string>` switching on MIME / extension; uses `pdfjs-dist` for PDFs, `mammoth` for DOCX, `FileReader` for TXT, throws a friendly error for unsupported types.
 
+**Dependencies (added via package install)**
+- `pdfjs-dist` — PDF text extraction in browser.
+- `mammoth` — DOCX text extraction in browser.
+
+(No backend / no audio transcription in this iteration — audio + `.doc` show a "not supported in browser" notice with a paste-text fallback.)
+
+### State & contracts in `CreateJob.tsx`
+
+```ts
+type Mode = 'select' | 'chat' | 'prompt' | 'upload';
+const [mode, setMode] = useState<Mode>('select');
+const [jdOverride, setJdOverride] = useState<string | null>(null); // populated by upload mode
+```
+
+- When `jdOverride` is set, the JD card renders that text and `downloadJD` exports it; otherwise it uses `buildJD(questions, answers)`.
+- A "Regenerate from fields" button in the JD card flips `jdOverride` back to `null` and re-renders via `buildJD`.
+- The client questionnaire phase reads `answers` and `clientAnswers` exactly as it does today — so it works identically across all three modes.
+
+### Header
+
+A small breadcrumb `Add Job › <Mode label>` with a **Change mode** ghost button (visible while `mode !== 'select'` and JD not yet finalized) that resets to `mode = 'select'` and clears `answers`, `messages`, `jdOverride`. After JD is generated and the client phase has started, the button is hidden to avoid losing the captured commercial answers.
+
+---
+
+## Notes
+
+- Mode picker is purely client-side; no admin/system-behavior changes needed for this feature.
+- Prompt-mode and upload-mode both feed into the same `answers` map, so the existing **Live Summary**, **Edit answer** dialog, and **client questionnaire** continue to work without modification.
+- PDF parsing via `pdfjs-dist` is bundle-heavy (~1MB). We'll lazy-import it inside `jdFileParser.ts` so the mode picker and chat mode aren't impacted.
+- Audio transcription is intentionally out of scope (would require an edge function + speech-to-text API). The UI shows a friendly notice and offers the paste fallback so the workflow is never blocked.

@@ -54,6 +54,9 @@ import {
   ClientQuestion,
 } from "@/data/clientQuestions";
 import { loadClientQuestions } from "@/data/clientQuestionsStore";
+import { ModeSelect, type CreateMode } from "@/components/createjob/ModeSelect";
+import { PromptMode } from "@/components/createjob/PromptMode";
+import { UploadMode } from "@/components/createjob/UploadMode";
 
 type Phase = "job" | "client";
 
@@ -212,6 +215,8 @@ const CreateJob = () => {
   const [editingId, setEditingId] = useState<string | null>(null); // job-question edit
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [autoFilledIds, setAutoFilledIds] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<CreateMode | "select">("select");
+  const [jdOverride, setJdOverride] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Eligible job-question pipeline
@@ -257,8 +262,9 @@ const CreateJob = () => {
 
   const jobPhaseDone = phase === "job" && currentJobQuestion == null;
 
-  // Initial greeting
+  // Initial greeting (only relevant for chat mode)
   useEffect(() => {
+    if (mode !== "chat") return;
     if (messages.length === 0) {
       const intro: ChatMessage = {
         id: uid(),
@@ -270,10 +276,11 @@ const CreateJob = () => {
       setMessages([intro]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mode]);
 
-  // Push the next JOB question into chat
+  // Push the next JOB question into chat (chat mode only)
   useEffect(() => {
+    if (mode !== "chat") return;
     if (phase !== "job") return;
     if (!currentJobQuestion) {
       // Job phase finished — generate JD then transition to client phase
@@ -315,7 +322,7 @@ const CreateJob = () => {
     ]);
     setMultiPick([]);
     setTextInput("");
-  }, [currentJobQuestion, askedIds, answers, questions, phase, clients.length]);
+  }, [currentJobQuestion, askedIds, answers, questions, phase, clients.length, mode]);
 
   // Push the next CLIENT question into chat
   useEffect(() => {
@@ -477,6 +484,11 @@ const CreateJob = () => {
       next.delete(qid);
       return next;
     });
+    // Don't auto-rebuild a JD that came from an uploaded/pasted source
+    if (jdOverride) {
+      toast({ title: "Answer updated" });
+      return;
+    }
     setMessages((prev) => {
       const idx = [...prev].reverse().findIndex((m) => (m as any).kind === "jd");
       if (idx === -1) return prev;
@@ -561,6 +573,84 @@ const CreateJob = () => {
     setAutoFilledIds(new Set());
     setEditingId(null);
     setEditingClientId(null);
+    setMode("select");
+    setJdOverride(null);
+  };
+
+  const changeMode = () => {
+    // Allow user to swap mode before they've started the client phase
+    setAnswers({});
+    setMessages([]);
+    setPhase("job");
+    setCompleted(false);
+    setTextInput("");
+    setMultiPick([]);
+    setAutoFilledIds(new Set());
+    setJdOverride(null);
+    setMode("select");
+  };
+
+  /**
+   * Used by Prompt & Upload modes to seed the chat with a generated/imported
+   * JD and jump directly into the client questionnaire phase.
+   */
+  const bootstrapFromAnswers = (
+    seededAnswers: Answers,
+    overrideJd: string | null,
+  ) => {
+    const sortedActive = [...questions]
+      .sort((a, b) => a.order - b.order)
+      .filter((q) => q.active && seededAnswers[q.id] != null);
+
+    const seededMessages: ChatMessage[] = [];
+    seededMessages.push({
+      id: uid(),
+      role: "assistant",
+      kind: "info",
+      text: overrideJd
+        ? "Got it ✨ I imported your JD and pre-filled the structured fields below."
+        : "Perfect — I generated everything from your prompt. Here's the draft ✨",
+    });
+    // Echo each captured answer as a chat exchange so the Live Summary edit
+    // dialog and timeline make sense.
+    sortedActive.forEach((q) => {
+      seededMessages.push({
+        id: uid(),
+        role: "assistant",
+        kind: "question",
+        phase: "job",
+        questionId: q.id,
+        text: q.text,
+      });
+      const v = seededAnswers[q.id];
+      const display = Array.isArray(v) ? v.join(", ") : (v as string);
+      seededMessages.push({
+        id: uid(),
+        role: "user",
+        phase: "job",
+        questionId: q.id,
+        text: display || "(skipped)",
+      });
+    });
+
+    const jd = overrideJd || buildJD(questions, seededAnswers);
+    seededMessages.push({ id: uid(), role: "assistant", kind: "jd", text: jd });
+    seededMessages.push({
+      id: uid(),
+      role: "assistant",
+      kind: "info",
+      text:
+        clients.length === 0
+          ? "Your client directory is empty — add clients in the admin to capture commercial details."
+          : "Now let's capture the client & commercial details for this job. These stay internal and won't appear in the JD.",
+    });
+
+    setAnswers(seededAnswers);
+    setAutoFilledIds(new Set(sortedActive.map((q) => q.id)));
+    setJdOverride(overrideJd);
+    setMessages(seededMessages);
+    setPhase("client");
+    setMode("chat");
   };
 
   const totalActive =
@@ -654,12 +744,24 @@ const CreateJob = () => {
                   Create a Job
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Chat with Glohire AI to generate a JD
+                  {mode === "select"
+                    ? "Pick how you'd like to create this job"
+                    : mode === "prompt"
+                      ? "Prompt-based job creation"
+                      : mode === "upload"
+                        ? "Upload or paste a JD"
+                        : "Chat with Glohire AI to generate a JD"}
                 </p>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {mode !== "select" && phase === "job" && !completed && (
+              <Button variant="ghost" size="sm" onClick={changeMode}>
+                <ArrowLeft className="h-4 w-4" />
+                Change mode
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/system-behavior">
                 <Settings2 className="h-4 w-4" />
@@ -672,6 +774,29 @@ const CreateJob = () => {
       </header>
 
       <main className="container py-6 lg:py-10">
+        {mode === "select" && (
+          <ModeSelect onSelect={(m) => setMode(m)} />
+        )}
+
+        {mode === "prompt" && (
+          <PromptMode
+            questions={questions}
+            onBack={changeMode}
+            onComplete={(seeded) => bootstrapFromAnswers(seeded, null)}
+          />
+        )}
+
+        {mode === "upload" && (
+          <UploadMode
+            questions={questions}
+            onBack={changeMode}
+            onComplete={(seeded, jdText) =>
+              bootstrapFromAnswers(seeded, jdText)
+            }
+          />
+        )}
+
+        {mode === "chat" && (
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           {/* Chat column */}
           <Card className="relative overflow-hidden border-border/60">
@@ -953,6 +1078,7 @@ const CreateJob = () => {
             </Card>
           </aside>
         </div>
+        )}
       </main>
 
       {/* Edit JOB answer */}
