@@ -774,6 +774,29 @@ const CreateJob = () => {
       </header>
 
       <main className="container py-6 lg:py-10">
+        {mode === "select" && (
+          <ModeSelect onSelect={(m) => setMode(m)} />
+        )}
+
+        {mode === "prompt" && (
+          <PromptMode
+            questions={questions}
+            onBack={changeMode}
+            onComplete={(seeded) => bootstrapFromAnswers(seeded, null)}
+          />
+        )}
+
+        {mode === "upload" && (
+          <UploadMode
+            questions={questions}
+            onBack={changeMode}
+            onComplete={(seeded, jdText) =>
+              bootstrapFromAnswers(seeded, jdText)
+            }
+          />
+        )}
+
+        {mode === "chat" && (
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           {/* Chat column */}
           <Card className="relative overflow-hidden border-border/60">
