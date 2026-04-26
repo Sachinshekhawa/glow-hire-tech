@@ -278,8 +278,9 @@ const CreateJob = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Push the next JOB question into chat
+  // Push the next JOB question into chat (chat mode only)
   useEffect(() => {
+    if (mode !== "chat") return;
     if (phase !== "job") return;
     if (!currentJobQuestion) {
       // Job phase finished — generate JD then transition to client phase
