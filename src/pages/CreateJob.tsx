@@ -573,6 +573,84 @@ const CreateJob = () => {
     setAutoFilledIds(new Set());
     setEditingId(null);
     setEditingClientId(null);
+    setMode("select");
+    setJdOverride(null);
+  };
+
+  const changeMode = () => {
+    // Allow user to swap mode before they've started the client phase
+    setAnswers({});
+    setMessages([]);
+    setPhase("job");
+    setCompleted(false);
+    setTextInput("");
+    setMultiPick([]);
+    setAutoFilledIds(new Set());
+    setJdOverride(null);
+    setMode("select");
+  };
+
+  /**
+   * Used by Prompt & Upload modes to seed the chat with a generated/imported
+   * JD and jump directly into the client questionnaire phase.
+   */
+  const bootstrapFromAnswers = (
+    seededAnswers: Answers,
+    overrideJd: string | null,
+  ) => {
+    const sortedActive = [...questions]
+      .sort((a, b) => a.order - b.order)
+      .filter((q) => q.active && seededAnswers[q.id] != null);
+
+    const seededMessages: ChatMessage[] = [];
+    seededMessages.push({
+      id: uid(),
+      role: "assistant",
+      kind: "info",
+      text: overrideJd
+        ? "Got it ✨ I imported your JD and pre-filled the structured fields below."
+        : "Perfect — I generated everything from your prompt. Here's the draft ✨",
+    });
+    // Echo each captured answer as a chat exchange so the Live Summary edit
+    // dialog and timeline make sense.
+    sortedActive.forEach((q) => {
+      seededMessages.push({
+        id: uid(),
+        role: "assistant",
+        kind: "question",
+        phase: "job",
+        questionId: q.id,
+        text: q.text,
+      });
+      const v = seededAnswers[q.id];
+      const display = Array.isArray(v) ? v.join(", ") : (v as string);
+      seededMessages.push({
+        id: uid(),
+        role: "user",
+        phase: "job",
+        questionId: q.id,
+        text: display || "(skipped)",
+      });
+    });
+
+    const jd = overrideJd || buildJD(questions, seededAnswers);
+    seededMessages.push({ id: uid(), role: "assistant", kind: "jd", text: jd });
+    seededMessages.push({
+      id: uid(),
+      role: "assistant",
+      kind: "info",
+      text:
+        clients.length === 0
+          ? "Your client directory is empty — add clients in the admin to capture commercial details."
+          : "Now let's capture the client & commercial details for this job. These stay internal and won't appear in the JD.",
+    });
+
+    setAnswers(seededAnswers);
+    setAutoFilledIds(new Set(sortedActive.map((q) => q.id)));
+    setJdOverride(overrideJd);
+    setMessages(seededMessages);
+    setPhase("client");
+    setMode("chat");
   };
 
   const totalActive =
