@@ -15,10 +15,13 @@ import {
   Sparkles,
   LogOut,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import AppBar from "@mui/material/AppBar";
+import Toolbar from "@mui/material/Toolbar";
+import Avatar from "@mui/material/Avatar";
+import Badge from "@mui/material/Badge";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import InputBase from "@mui/material/InputBase";
 import ThemeToggle from "@/components/ThemeToggle";
 import DashboardSwitcher from "@/components/dashboard/DashboardSwitcher";
 import { recruiter } from "@/data/dashboardMock";
@@ -42,7 +45,7 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
 
   return (
     <div className="min-h-screen flex w-full bg-background">
-      {/* Sidebar */}
+      {/* Sidebar (custom, not MUI Drawer because it's permanent + uses layout grid) */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-card/40 backdrop-blur-xl">
         <div className="px-6 py-5 border-b border-border">
           <Link to="/" className="flex items-center gap-2 group">
@@ -97,54 +100,64 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-background/80 backdrop-blur-xl px-4 md:px-8">
-          <div className="lg:hidden flex items-center gap-2">
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
-            </span>
-            <span className="font-display font-bold">
-              Glo<span className="gradient-text">hire</span>
-            </span>
-          </div>
-
-          <div className="hidden md:flex flex-1 max-w-md relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search jobs, candidates, clients…"
-              className="pl-10 h-10 bg-muted/40 border-border"
-            />
-          </div>
-
-          <div className="flex-1 md:hidden" />
-
-          <DashboardSwitcher />
-
-          <Button asChild variant="hero" size="sm" className="hidden sm:inline-flex">
-            <Link to="/create-job">
-              <Plus className="h-4 w-4" />
-              New job
-            </Link>
-          </Button>
-          <ThemeToggle />
-          <button
-            className="relative flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-          </button>
-          <div className="flex items-center gap-2 pl-2 border-l border-border">
-            <Avatar className="h-9 w-9">
-              <AvatarFallback className="bg-gradient-primary text-primary-foreground text-sm font-semibold">
-                {recruiter.initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="hidden md:block leading-tight">
-              <div className="text-sm font-medium">{recruiter.name}</div>
-              <div className="text-xs text-muted-foreground">{recruiter.role}</div>
+        <AppBar position="sticky" elevation={0}>
+          <Toolbar sx={{ gap: 1.5, px: { xs: 2, md: 4 }, minHeight: 64 }}>
+            <div className="lg:hidden flex items-center gap-2">
+              <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
+                <Sparkles className="h-4 w-4 text-primary-foreground" />
+              </span>
+              <span className="font-display font-bold">
+                Glo<span className="gradient-text">hire</span>
+              </span>
             </div>
-          </div>
-        </header>
+
+            <div className="hidden md:flex flex-1 max-w-md relative items-center">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <InputBase
+                placeholder="Search jobs, candidates, clients…"
+                sx={{
+                  width: "100%",
+                  pl: 5,
+                  pr: 2,
+                  height: 40,
+                  borderRadius: 2,
+                  border: "1px solid hsl(var(--border))",
+                  backgroundColor: "hsl(var(--muted) / 0.4)",
+                  fontSize: 14,
+                }}
+              />
+            </div>
+
+            <div className="flex-1 md:hidden" />
+
+            <DashboardSwitcher />
+
+            <Button
+              component={Link}
+              to="/create-job"
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<Plus className="h-4 w-4" />}
+              sx={{ display: { xs: "none", sm: "inline-flex" } }}
+            >
+              New job
+            </Button>
+            <ThemeToggle />
+            <IconButton aria-label="Notifications" sx={{ border: "1px solid hsl(var(--border))", borderRadius: 1.25, width: 36, height: 36 }}>
+              <Badge variant="dot" color="primary" overlap="circular">
+                <Bell className="h-4 w-4" />
+              </Badge>
+            </IconButton>
+            <div className="flex items-center gap-2 pl-2 border-l border-border">
+              <Avatar sx={{ width: 36, height: 36, fontSize: 14 }}>{recruiter.initials}</Avatar>
+              <div className="hidden md:block leading-tight">
+                <div className="text-sm font-medium">{recruiter.name}</div>
+                <div className="text-xs text-muted-foreground">{recruiter.role}</div>
+              </div>
+            </div>
+          </Toolbar>
+        </AppBar>
 
         <main className="flex-1 px-4 md:px-8 py-6 md:py-8 max-w-[1600px] w-full mx-auto">
           {children}

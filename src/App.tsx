@@ -14,12 +14,14 @@ import SystemBehavior from "./pages/SystemBehavior.tsx";
 import ClientFieldsAdmin from "./pages/ClientFieldsAdmin.tsx";
 import CreateJob from "./pages/CreateJob.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
+import MuiThemeBridge from "./components/MuiThemeBridge";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
+      <MuiThemeBridge>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -39,6 +41,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </MuiThemeBridge>
     </ThemeProvider>
   </QueryClientProvider>
 );

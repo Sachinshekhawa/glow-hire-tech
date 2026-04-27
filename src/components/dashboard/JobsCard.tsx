@@ -1,46 +1,54 @@
 import { Link } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import Card from "@mui/material/Card";
+import CardHeader from "@mui/material/CardHeader";
+import CardContent from "@mui/material/CardContent";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import LinearProgress from "@mui/material/LinearProgress";
 import { Briefcase, MapPin, Clock, ArrowRight } from "lucide-react";
 import { jobs } from "@/data/dashboardMock";
-import { cn } from "@/lib/utils";
 
-const priorityStyle = {
-  High: "bg-destructive/15 text-destructive border-destructive/30",
-  Medium: "bg-amber-500/15 text-amber-500 border-amber-500/30",
-  Low: "bg-muted text-muted-foreground border-border",
+const priorityChip = {
+  High: { bg: "hsl(var(--destructive) / 0.15)", color: "hsl(var(--destructive))", border: "hsl(var(--destructive) / 0.3)" },
+  Medium: { bg: "hsl(38 92% 50% / 0.15)", color: "hsl(38 92% 55%)", border: "hsl(38 92% 50% / 0.3)" },
+  Low: { bg: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", border: "hsl(var(--border))" },
 };
 
-const statusStyle = {
-  Open: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-  "On hold": "bg-amber-500/15 text-amber-500 border-amber-500/30",
-  Closed: "bg-muted text-muted-foreground border-border",
+const statusChip = {
+  Open: { bg: "hsl(160 84% 39% / 0.15)", color: "hsl(160 84% 45%)", border: "hsl(160 84% 39% / 0.3)" },
+  "On hold": { bg: "hsl(38 92% 50% / 0.15)", color: "hsl(38 92% 55%)", border: "hsl(38 92% 50% / 0.3)" },
+  Closed: { bg: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", border: "hsl(var(--border))" },
 };
 
 const JobsCard = () => {
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-primary" />
-              My jobs
-            </CardTitle>
-            <CardDescription>Active requisitions assigned to you</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/create-job">
-              New job <ArrowRight className="h-3 w-3" />
-            </Link>
+      <CardHeader
+        title={
+          <span className="text-lg font-semibold tracking-tight flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-primary" />
+            My jobs
+          </span>
+        }
+        subheader={<span className="text-sm text-muted-foreground">Active requisitions assigned to you</span>}
+        action={
+          <Button
+            component={Link}
+            to="/create-job"
+            variant="outlined"
+            size="small"
+            endIcon={<ArrowRight className="h-3 w-3" />}
+            sx={{ mr: 2, mt: 1 }}
+          >
+            New job
           </Button>
-        </div>
-      </CardHeader>
+        }
+      />
       <CardContent className="space-y-3">
         {jobs.map((job) => {
           const fillPct = (job.filled / job.positions) * 100;
+          const sStatus = statusChip[job.status];
+          const sPrio = priorityChip[job.priority];
           return (
             <div
               key={job.id}
@@ -50,12 +58,18 @@ const JobsCard = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-semibold truncate">{job.title}</h4>
-                    <Badge variant="outline" className={cn("text-[10px]", statusStyle[job.status])}>
-                      {job.status}
-                    </Badge>
-                    <Badge variant="outline" className={cn("text-[10px]", priorityStyle[job.priority])}>
-                      {job.priority}
-                    </Badge>
+                    <Chip
+                      label={job.status}
+                      size="small"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: 10, backgroundColor: sStatus.bg, color: sStatus.color, borderColor: sStatus.border }}
+                    />
+                    <Chip
+                      label={job.priority}
+                      size="small"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: 10, backgroundColor: sPrio.bg, color: sPrio.color, borderColor: sPrio.border }}
+                    />
                   </div>
                   <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                     <span>{job.client}</span>
@@ -77,7 +91,7 @@ const JobsCard = () => {
                   <div className="text-xs text-muted-foreground">filled</div>
                 </div>
               </div>
-              <Progress value={fillPct} className="mt-3 h-1.5" />
+              <LinearProgress variant="determinate" value={fillPct} sx={{ mt: 1.5, height: 6, borderRadius: 999 }} />
             </div>
           );
         })}
