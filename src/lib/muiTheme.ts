@@ -123,27 +123,38 @@ export const buildMuiTheme = (mode: Mode): Theme => {
             paddingInline: 16,
             fontWeight: 600,
           },
-          containedPrimary: {
-            background: "var(--gradient-primary)",
-            color: primaryFg,
-            boxShadow: "var(--shadow-glow)",
-            "&:hover": {
-              background: "var(--gradient-primary)",
-              boxShadow: "var(--shadow-violet)",
-              transform: "scale(1.02)",
-            },
-            transition: "all 0.3s var(--transition-smooth)",
-          },
-          outlined: {
-            borderColor: border,
-            color: fg,
-            "&:hover": { backgroundColor: muted, borderColor: primaryMain },
-          },
-          text: {
-            color: fg,
-            "&:hover": { backgroundColor: muted },
-          },
         },
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              background: "var(--gradient-primary)",
+              color: primaryFg,
+              boxShadow: "var(--shadow-glow)",
+              transition: "all 0.3s var(--transition-smooth)",
+              "&:hover": {
+                background: "var(--gradient-primary)",
+                boxShadow: "var(--shadow-violet)",
+                transform: "scale(1.02)",
+              },
+            },
+          },
+          {
+            props: { variant: "outlined" },
+            style: {
+              borderColor: border,
+              color: fg,
+              "&:hover": { backgroundColor: muted, borderColor: primaryMain },
+            },
+          },
+          {
+            props: { variant: "text" },
+            style: {
+              color: fg,
+              "&:hover": { backgroundColor: muted },
+            },
+          },
+        ],
       },
       MuiIconButton: {
         styleOverrides: {
