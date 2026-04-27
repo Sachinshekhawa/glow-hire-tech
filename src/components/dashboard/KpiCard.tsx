@@ -1,5 +1,6 @@
 import { LucideIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import Card from "@mui/material/Card";
+import Box from "@mui/material/Box";
 import { cn } from "@/lib/utils";
 import type { Kpi } from "@/data/dashboardMock";
 
@@ -28,8 +29,13 @@ const KpiCard = ({ kpi, icon: Icon, accent = "primary" }: Props) => {
         : "text-muted-foreground";
 
   return (
-    <Card className="relative overflow-hidden p-5 group hover:border-primary/40 transition-colors">
-      <div
+    <Card
+      className="relative overflow-hidden p-5 group transition-colors"
+      sx={{
+        "&:hover": { borderColor: "hsl(var(--primary) / 0.4)" },
+      }}
+    >
+      <Box
         className={cn(
           "absolute -top-10 -right-10 h-32 w-32 rounded-full bg-gradient-to-br opacity-60 blur-2xl pointer-events-none",
           accentMap[accent],
@@ -49,9 +55,7 @@ const KpiCard = ({ kpi, icon: Icon, accent = "primary" }: Props) => {
               {Math.abs(kpi.delta)}%
             </span>
           </div>
-          {kpi.hint && (
-            <p className="text-xs text-muted-foreground">{kpi.hint}</p>
-          )}
+          {kpi.hint && <p className="text-xs text-muted-foreground">{kpi.hint}</p>}
         </div>
         <div
           className={cn(

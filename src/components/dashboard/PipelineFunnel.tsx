@@ -1,4 +1,7 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import Card from "@mui/material/Card";
+import CardHeader from "@mui/material/CardHeader";
+import CardContent from "@mui/material/CardContent";
+import LinearProgress from "@mui/material/LinearProgress";
 import { pipelineFunnel } from "@/data/dashboardMock";
 
 type Props = {
@@ -16,10 +19,10 @@ const PipelineFunnel = ({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
+      <CardHeader
+        title={<span className="text-lg font-semibold tracking-tight">{title}</span>}
+        subheader={<span className="text-sm text-muted-foreground">{description}</span>}
+      />
       <CardContent className="space-y-3">
         {data.map((stage, i) => {
           const pct = (stage.count / max) * 100;
@@ -38,12 +41,11 @@ const PipelineFunnel = ({
                   <span className="font-semibold tabular-nums">{stage.count}</span>
                 </div>
               </div>
-              <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-primary transition-all duration-700"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
+              <LinearProgress
+                variant="determinate"
+                value={pct}
+                sx={{ height: 10, borderRadius: 999 }}
+              />
             </div>
           );
         })}

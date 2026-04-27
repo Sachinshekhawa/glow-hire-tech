@@ -1,14 +1,16 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import Card from "@mui/material/Card";
+import CardHeader from "@mui/material/CardHeader";
+import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
 import { Bot, Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { aiInterviews } from "@/data/dashboardMock";
 import { cn } from "@/lib/utils";
 
 const statusMap = {
-  Scheduled: { icon: Clock, color: "text-primary bg-primary/15 border-primary/30" },
-  "In progress": { icon: Loader2, color: "text-accent bg-accent/15 border-accent/30" },
-  Completed: { icon: CheckCircle2, color: "text-emerald-500 bg-emerald-500/15 border-emerald-500/30" },
-  Expired: { icon: AlertCircle, color: "text-destructive bg-destructive/15 border-destructive/30" },
+  Scheduled: { icon: Clock, color: "text-primary bg-primary/15 border-primary/30", chipBg: "hsl(var(--primary) / 0.15)", chipFg: "hsl(var(--primary))", chipBorder: "hsl(var(--primary) / 0.3)" },
+  "In progress": { icon: Loader2, color: "text-accent bg-accent/15 border-accent/30", chipBg: "hsl(var(--accent) / 0.15)", chipFg: "hsl(var(--accent))", chipBorder: "hsl(var(--accent) / 0.3)" },
+  Completed: { icon: CheckCircle2, color: "text-emerald-500 bg-emerald-500/15 border-emerald-500/30", chipBg: "hsl(160 84% 39% / 0.15)", chipFg: "hsl(160 84% 45%)", chipBorder: "hsl(160 84% 39% / 0.3)" },
+  Expired: { icon: AlertCircle, color: "text-destructive bg-destructive/15 border-destructive/30", chipBg: "hsl(var(--destructive) / 0.15)", chipFg: "hsl(var(--destructive))", chipBorder: "hsl(var(--destructive) / 0.3)" },
 };
 
 const formatWhen = (iso: string) =>
@@ -27,23 +29,21 @@ const AiInterviewsCard = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground shadow-glow">
-              <Bot className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">AI interviews</CardTitle>
-              <CardDescription>Automated screening pipeline</CardDescription>
-            </div>
+      <CardHeader
+        avatar={
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground shadow-glow">
+            <Bot className="h-5 w-5" />
           </div>
-          <div className="text-right">
+        }
+        title={<span className="text-lg font-semibold tracking-tight">AI interviews</span>}
+        subheader={<span className="text-sm text-muted-foreground">Automated screening pipeline</span>}
+        action={
+          <div className="text-right pr-4 pt-1">
             <div className="font-display text-2xl font-bold">{avgScore}</div>
             <div className="text-xs text-muted-foreground">avg score</div>
           </div>
-        </div>
-      </CardHeader>
+        }
+      />
       <CardContent className="space-y-2">
         {aiInterviews.map((ai) => {
           const meta = statusMap[ai.status];
@@ -63,9 +63,18 @@ const AiInterviewsCard = () => {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <Badge variant="outline" className={cn("text-[10px]", meta.color)}>
-                  {ai.status}
-                </Badge>
+                <Chip
+                  label={ai.status}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    height: 20,
+                    fontSize: 10,
+                    backgroundColor: meta.chipBg,
+                    color: meta.chipFg,
+                    borderColor: meta.chipBorder,
+                  }}
+                />
                 {ai.score !== undefined && (
                   <span className="text-xs font-semibold tabular-nums">{ai.score}/100</span>
                 )}

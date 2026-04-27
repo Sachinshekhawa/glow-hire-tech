@@ -1,4 +1,6 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import Card from "@mui/material/Card";
+import CardHeader from "@mui/material/CardHeader";
+import CardContent from "@mui/material/CardContent";
 import { Award, CalendarClock, Bot, Send, Briefcase } from "lucide-react";
 import { activity } from "@/data/dashboardMock";
 import { cn } from "@/lib/utils";
@@ -14,10 +16,10 @@ const iconMap = {
 const ActivityFeed = () => {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Activity feed</CardTitle>
-        <CardDescription>Latest updates across your work</CardDescription>
-      </CardHeader>
+      <CardHeader
+        title={<span className="text-lg font-semibold tracking-tight">Activity feed</span>}
+        subheader={<span className="text-sm text-muted-foreground">Latest updates across your work</span>}
+      />
       <CardContent>
         <ol className="relative space-y-4 before:absolute before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-border">
           {activity.map((e) => {

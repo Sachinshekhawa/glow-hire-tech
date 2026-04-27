@@ -1,32 +1,12 @@
-import { Card } from "@/components/ui/card";
+import Card from "@mui/material/Card";
 import { Clock, ArrowRightLeft, Target, Zap } from "lucide-react";
 import { supportingMetrics } from "@/data/dashboardMock";
 
 const items = [
-  {
-    label: "Avg time to fill",
-    value: `${supportingMetrics.avgTimeToFillDays}d`,
-    icon: Clock,
-    note: "−2 days vs last month",
-  },
-  {
-    label: "Submission → interview",
-    value: `${supportingMetrics.submissionToInterview}%`,
-    icon: ArrowRightLeft,
-    note: "+5% MoM",
-  },
-  {
-    label: "Interview → offer",
-    value: `${supportingMetrics.interviewToOffer}%`,
-    icon: Target,
-    note: "stable",
-  },
-  {
-    label: "Avg response time",
-    value: `${supportingMetrics.responseTimeHours}h`,
-    icon: Zap,
-    note: "−30 min vs last week",
-  },
+  { label: "Avg time to fill", value: `${supportingMetrics.avgTimeToFillDays}d`, icon: Clock, note: "−2 days vs last month" },
+  { label: "Submission → interview", value: `${supportingMetrics.submissionToInterview}%`, icon: ArrowRightLeft, note: "+5% MoM" },
+  { label: "Interview → offer", value: `${supportingMetrics.interviewToOffer}%`, icon: Target, note: "stable" },
+  { label: "Avg response time", value: `${supportingMetrics.responseTimeHours}h`, icon: Zap, note: "−30 min vs last week" },
 ];
 
 const PerformanceStrip = () => {
