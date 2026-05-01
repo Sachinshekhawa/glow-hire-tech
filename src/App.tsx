@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import BlogIndex from "./pages/Blog.tsx";
 import BlogPost from "./pages/BlogPost.tsx";
 import SignIn from "./pages/SignIn.tsx";
+import ForgotPassword from "./pages/ForgotPassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import ManagerDashboard from "./pages/ManagerDashboard.tsx";
 import SystemBehavior from "./pages/SystemBehavior.tsx";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/blog" element={<BlogIndex />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/signin" element={<SignIn />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/manager" element={<ManagerDashboard />} />
             <Route path="/admin/system-behavior" element={<SystemBehavior />} />

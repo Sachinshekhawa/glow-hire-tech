@@ -4,6 +4,7 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import { Award } from "lucide-react";
 import { offers } from "@/data/dashboardMock";
+import { useDateRange } from "@/lib/dateRange";
 
 const statusChip = {
   Pending: { bg: "hsl(38 92% 50% / 0.15)", color: "hsl(38 92% 55%)", border: "hsl(38 92% 50% / 0.3)" },
@@ -13,8 +14,16 @@ const statusChip = {
 };
 
 const OffersCard = () => {
-  const accepted = offers.filter((o) => o.status === "Accepted" || o.status === "Joined").length;
-  const acceptanceRate = Math.round((accepted / offers.length) * 100);
+  const { range, factor, filterByDate } = useDateRange();
+  const filtered = filterByDate(offers, (o) => o.sentAt);
+  const visible =
+    range === "all"
+      ? offers
+      : filtered.length
+        ? filtered
+        : offers.slice(0, Math.max(1, Math.round(offers.length * factor)));
+  const accepted = visible.filter((o) => o.status === "Accepted" || o.status === "Joined").length;
+  const acceptanceRate = visible.length ? Math.round((accepted / visible.length) * 100) : 0;
 
   return (
     <Card>
@@ -34,7 +43,7 @@ const OffersCard = () => {
         }
       />
       <CardContent className="space-y-2">
-        {offers.map((o) => {
+        {visible.map((o) => {
           const c = statusChip[o.status];
           return (
             <div

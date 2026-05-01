@@ -5,6 +5,7 @@ import Chip from "@mui/material/Chip";
 import { Bot, Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { aiInterviews } from "@/data/dashboardMock";
 import { cn } from "@/lib/utils";
+import { useDateRange } from "@/lib/dateRange";
 
 const statusMap = {
   Scheduled: { icon: Clock, color: "text-primary bg-primary/15 border-primary/30", chipBg: "hsl(var(--primary) / 0.15)", chipFg: "hsl(var(--primary))", chipBorder: "hsl(var(--primary) / 0.3)" },
@@ -22,7 +23,12 @@ const formatWhen = (iso: string) =>
   });
 
 const AiInterviewsCard = () => {
-  const completed = aiInterviews.filter((a) => a.status === "Completed");
+  const { range, factor } = useDateRange();
+  const visible =
+    range === "all"
+      ? aiInterviews
+      : aiInterviews.slice(0, Math.max(1, Math.round(aiInterviews.length * factor)));
+  const completed = visible.filter((a) => a.status === "Completed");
   const avgScore = completed.length
     ? Math.round(completed.reduce((s, a) => s + (a.score ?? 0), 0) / completed.length)
     : 0;
@@ -45,7 +51,7 @@ const AiInterviewsCard = () => {
         }
       />
       <CardContent className="space-y-2">
-        {aiInterviews.map((ai) => {
+        {visible.map((ai) => {
           const meta = statusMap[ai.status];
           const Icon = meta.icon;
           return (

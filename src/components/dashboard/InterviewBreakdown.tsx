@@ -1,20 +1,36 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { interviewMix, aiInterviewMix } from "@/data/managerMock";
+import { useDateRange } from "@/lib/dateRange";
 
 const InterviewBreakdown = () => {
+  const { scale } = useDateRange();
+  const im = {
+    scheduled: scale(interviewMix.scheduled),
+    inProgress: scale(interviewMix.inProgress),
+    completed: scale(interviewMix.completed),
+    rescheduled: scale(interviewMix.rescheduled),
+    noShow: scale(interviewMix.noShow),
+    cancelled: scale(interviewMix.cancelled),
+  };
+  const ai = {
+    scheduled: scale(aiInterviewMix.scheduled),
+    inProgress: scale(aiInterviewMix.inProgress),
+    completed: scale(aiInterviewMix.completed),
+    expired: scale(aiInterviewMix.expired),
+  };
   const clientRows = [
-    { label: "Scheduled", value: interviewMix.scheduled, color: "bg-primary" },
-    { label: "In progress", value: interviewMix.inProgress, color: "bg-accent" },
-    { label: "Completed", value: interviewMix.completed, color: "bg-emerald-500" },
-    { label: "Rescheduled", value: interviewMix.rescheduled, color: "bg-amber-500" },
-    { label: "No-show", value: interviewMix.noShow, color: "bg-destructive" },
-    { label: "Cancelled", value: interviewMix.cancelled, color: "bg-muted-foreground" },
+    { label: "Scheduled", value: im.scheduled, color: "bg-primary" },
+    { label: "In progress", value: im.inProgress, color: "bg-accent" },
+    { label: "Completed", value: im.completed, color: "bg-emerald-500" },
+    { label: "Rescheduled", value: im.rescheduled, color: "bg-amber-500" },
+    { label: "No-show", value: im.noShow, color: "bg-destructive" },
+    { label: "Cancelled", value: im.cancelled, color: "bg-muted-foreground" },
   ];
   const aiRows = [
-    { label: "Scheduled", value: aiInterviewMix.scheduled, color: "bg-primary" },
-    { label: "In progress", value: aiInterviewMix.inProgress, color: "bg-accent" },
-    { label: "Completed", value: aiInterviewMix.completed, color: "bg-emerald-500" },
-    { label: "Expired", value: aiInterviewMix.expired, color: "bg-destructive" },
+    { label: "Scheduled", value: ai.scheduled, color: "bg-primary" },
+    { label: "In progress", value: ai.inProgress, color: "bg-accent" },
+    { label: "Completed", value: ai.completed, color: "bg-emerald-500" },
+    { label: "Expired", value: ai.expired, color: "bg-destructive" },
   ];
 
   const Section = ({ title, total, rows }: { title: string; total: number; rows: typeof clientRows }) => (

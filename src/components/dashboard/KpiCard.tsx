@@ -3,6 +3,7 @@ import Card from "@mui/material/Card";
 import Box from "@mui/material/Box";
 import { cn } from "@/lib/utils";
 import type { Kpi } from "@/data/dashboardMock";
+import { useDateRange } from "@/lib/dateRange";
 
 type Props = {
   kpi: Kpi;
@@ -18,6 +19,7 @@ const accentMap = {
 };
 
 const KpiCard = ({ kpi, icon: Icon, accent = "primary" }: Props) => {
+  const { scale, factor } = useDateRange();
   const trendIcon =
     kpi.trend === "up" ? TrendingUp : kpi.trend === "down" ? TrendingDown : Minus;
   const TrendIcon = trendIcon;
@@ -27,6 +29,16 @@ const KpiCard = ({ kpi, icon: Icon, accent = "primary" }: Props) => {
       : kpi.trend === "down"
         ? "text-destructive"
         : "text-muted-foreground";
+
+  // Scale numeric values; preserve string values (e.g. "17d", "74%") with a
+  // best-effort numeric extraction so manager KPIs also react to the filter.
+  const displayValue = (() => {
+    if (typeof kpi.value === "number") return scale(kpi.value);
+    const m = String(kpi.value).match(/^(-?\d+(?:\.\d+)?)(.*)$/);
+    if (!m) return kpi.value;
+    return `${scale(parseFloat(m[1]))}${m[2]}`;
+  })();
+  const displayDelta = Math.abs(Math.round(kpi.delta * (factor === 1 ? 1 : factor + 0.2)));
 
   return (
     <Card
@@ -48,11 +60,11 @@ const KpiCard = ({ kpi, icon: Icon, accent = "primary" }: Props) => {
           </p>
           <div className="flex items-end gap-2">
             <span className="font-display text-3xl font-bold leading-none">
-              {kpi.value}
+              {displayValue}
             </span>
             <span className={cn("flex items-center gap-0.5 text-xs font-medium pb-1", trendColor)}>
               <TrendIcon className="h-3 w-3" />
-              {Math.abs(kpi.delta)}%
+              {displayDelta}%
             </span>
           </div>
           {kpi.hint && <p className="text-xs text-muted-foreground">{kpi.hint}</p>}

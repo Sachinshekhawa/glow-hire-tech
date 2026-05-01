@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, ArrowUpRight } from "lucide-react";
 import { clientScorecards } from "@/data/managerMock";
 import { cn } from "@/lib/utils";
+import { useDateRange } from "@/lib/dateRange";
 
 const healthStyle: Record<string, string> = {
   Excellent: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
@@ -12,6 +13,7 @@ const healthStyle: Record<string, string> = {
 };
 
 const ClientScorecards = () => {
+  const { scale } = useDateRange();
   return (
     <Card>
       <CardHeader>
@@ -50,11 +52,11 @@ const ClientScorecards = () => {
 
             <div className="grid grid-cols-5 gap-2 text-center">
               {[
-                { label: "Jobs", value: c.openJobs },
-                { label: "Cands", value: c.candidates },
-                { label: "Subs", value: c.submissions },
-                { label: "Intv", value: c.interviews },
-                { label: "Offers", value: c.offers },
+                { label: "Jobs", value: scale(c.openJobs) },
+                { label: "Cands", value: scale(c.candidates) },
+                { label: "Subs", value: scale(c.submissions) },
+                { label: "Intv", value: scale(c.interviews) },
+                { label: "Offers", value: scale(c.offers) },
               ].map((m) => (
                 <div key={m.label} className="rounded-md bg-muted/40 px-1 py-2">
                   <div className="font-display text-base font-bold leading-none tabular-nums">
@@ -69,7 +71,7 @@ const ClientScorecards = () => {
 
             <div className="mt-3 flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
-                Revenue <span className="text-foreground font-medium">{c.revenue}</span> · {c.joins} joined
+                Revenue <span className="text-foreground font-medium">{c.revenue}</span> · {scale(c.joins)} joined
               </span>
               <span className="text-muted-foreground flex items-center gap-1">
                 {c.lastActivity}

@@ -7,6 +7,7 @@ import Chip from "@mui/material/Chip";
 import LinearProgress from "@mui/material/LinearProgress";
 import { Briefcase, MapPin, Clock, ArrowRight } from "lucide-react";
 import { jobs } from "@/data/dashboardMock";
+import { useDateRange } from "@/lib/dateRange";
 
 const priorityChip = {
   High: { bg: "hsl(var(--destructive) / 0.15)", color: "hsl(var(--destructive))", border: "hsl(var(--destructive) / 0.3)" },
@@ -21,6 +22,8 @@ const statusChip = {
 };
 
 const JobsCard = () => {
+  const { factor, range } = useDateRange();
+  const visible = range === "all" ? jobs : jobs.slice(0, Math.max(1, Math.round(jobs.length * factor)));
   return (
     <Card>
       <CardHeader
@@ -45,7 +48,7 @@ const JobsCard = () => {
         }
       />
       <CardContent className="space-y-3">
-        {jobs.map((job) => {
+        {visible.map((job) => {
           const fillPct = (job.filled / job.positions) * 100;
           const sStatus = statusChip[job.status];
           const sPrio = priorityChip[job.priority];

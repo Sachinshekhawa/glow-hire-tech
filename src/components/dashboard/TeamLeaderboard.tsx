@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { teamMembers } from "@/data/managerMock";
 import { cn } from "@/lib/utils";
+import { useDateRange } from "@/lib/dateRange";
 
 const statusStyle: Record<string, string> = {
   active: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
@@ -12,6 +13,7 @@ const statusStyle: Record<string, string> = {
 };
 
 const TeamLeaderboard = () => {
+  const { scale } = useDateRange();
   const sorted = [...teamMembers].sort((a, b) => b.submissions - a.submissions);
 
   return (
@@ -65,12 +67,12 @@ const TeamLeaderboard = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="text-right tabular-nums px-2">{m.jobs}</td>
-                  <td className="text-right tabular-nums px-2 font-medium">{m.submissions}</td>
-                  <td className="text-right tabular-nums px-2">{m.interviews}</td>
-                  <td className="text-right tabular-nums px-2">{m.aiInterviews}</td>
-                  <td className="text-right tabular-nums px-2">{m.offers}</td>
-                  <td className="text-right tabular-nums px-2">{m.joins}</td>
+                  <td className="text-right tabular-nums px-2">{scale(m.jobs)}</td>
+                  <td className="text-right tabular-nums px-2 font-medium">{scale(m.submissions)}</td>
+                  <td className="text-right tabular-nums px-2">{scale(m.interviews)}</td>
+                  <td className="text-right tabular-nums px-2">{scale(m.aiInterviews)}</td>
+                  <td className="text-right tabular-nums px-2">{scale(m.offers)}</td>
+                  <td className="text-right tabular-nums px-2">{scale(m.joins)}</td>
                   <td className="text-right tabular-nums px-2">{m.conversionPct}%</td>
                   <td className="pl-2">
                     <span className={cn("inline-flex items-center gap-0.5 text-xs font-medium justify-end w-full", trendColor)}>

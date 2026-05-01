@@ -1,19 +1,24 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { teamSubmissionsTrend } from "@/data/managerMock";
+import { useDateRange } from "@/lib/dateRange";
 
 const TeamTrendChart = () => {
-  const max = Math.max(
-    ...teamSubmissionsTrend.flatMap((d) => [d.submissions, d.interviews]),
-  );
-  const totalSubs = teamSubmissionsTrend.reduce((s, d) => s + d.submissions, 0);
-  const totalIntv = teamSubmissionsTrend.reduce((s, d) => s + d.interviews, 0);
+  const { scale, label } = useDateRange();
+  const data = teamSubmissionsTrend.map((d) => ({
+    ...d,
+    submissions: scale(d.submissions),
+    interviews: scale(d.interviews),
+  }));
+  const max = Math.max(...data.flatMap((d) => [d.submissions, d.interviews]), 1);
+  const totalSubs = data.reduce((s, d) => s + d.submissions, 0);
+  const totalIntv = data.reduce((s, d) => s + d.interviews, 0);
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg">Team output · last 7 days</CardTitle>
+            <CardTitle className="text-lg">Team output · {label}</CardTitle>
             <CardDescription>
               Submissions vs client interviews by day
             </CardDescription>
@@ -32,7 +37,7 @@ const TeamTrendChart = () => {
       </CardHeader>
       <CardContent>
         <div className="flex items-end justify-between gap-3 h-44">
-          {teamSubmissionsTrend.map((d) => {
+          {data.map((d) => {
             const sH = (d.submissions / max) * 100;
             const iH = (d.interviews / max) * 100;
             return (
