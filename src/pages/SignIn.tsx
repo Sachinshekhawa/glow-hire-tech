@@ -116,14 +116,16 @@ const SignIn = () => {
                 placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                slotProps={{ htmlInput: { maxLength: 255 } }}
                 required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  htmlInput: { maxLength: 255 },
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                      </InputAdornment>
+                    ),
+                  },
                 }}
               />
             </div>
@@ -137,29 +139,31 @@ const SignIn = () => {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                slotProps={{ htmlInput: { maxLength: 128 } }}
                 required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock className="h-4 w-4 text-muted-foreground" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setShowPassword((s) => !s)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  htmlInput: { maxLength: 128 },
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setShowPassword((s) => !s)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
                 }}
               />
               <div className="flex justify-end mt-2">
