@@ -169,6 +169,7 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
         </main>
       </div>
     </div>
+    </DateRangeProvider>
   );
 };
 
