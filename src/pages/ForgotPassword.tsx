@@ -110,7 +110,7 @@ const ForgotPassword = () => {
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  inputProps={{ maxLength: 255 }}
+                  slotProps={{ htmlInput: { maxLength: 255 } }}
                   required
                   autoFocus
                   InputProps={{

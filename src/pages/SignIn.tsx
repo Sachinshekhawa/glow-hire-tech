@@ -116,7 +116,7 @@ const SignIn = () => {
                 placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                inputProps={{ maxLength: 255 }}
+                slotProps={{ htmlInput: { maxLength: 255 } }}
                 required
                 InputProps={{
                   startAdornment: (
@@ -137,7 +137,7 @@ const SignIn = () => {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                inputProps={{ maxLength: 128 }}
+                slotProps={{ htmlInput: { maxLength: 128 } }}
                 required
                 InputProps={{
                   startAdornment: (
