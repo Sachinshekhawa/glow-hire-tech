@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { managerActivity } from "@/data/managerMock";
 import { Award, Send, CalendarClock, Building2, Bot, AlertTriangle } from "lucide-react";
+import { useDateRange } from "@/lib/dateRange";
 
 const iconMap = {
   offer: Award,
@@ -30,6 +31,11 @@ const initialsOf = (name: string) =>
     .toUpperCase();
 
 const ManagerActivityFeed = () => {
+  const { range, factor } = useDateRange();
+  const visible =
+    range === "all"
+      ? managerActivity
+      : managerActivity.slice(0, Math.max(1, Math.round(managerActivity.length * factor)));
   return (
     <Card>
       <CardHeader>
@@ -37,7 +43,7 @@ const ManagerActivityFeed = () => {
         <CardDescription>Latest moves across recruiters and clients</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {managerActivity.map((a) => {
+        {visible.map((a) => {
           const Icon = iconMap[a.kind];
           return (
             <div key={a.id} className="flex gap-3">

@@ -1,23 +1,26 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { goals } from "@/data/managerMock";
+import { useDateRange } from "@/lib/dateRange";
 
 const GoalsCard = () => {
+  const { scale, label } = useDateRange();
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Monthly goals</CardTitle>
-        <CardDescription>Team progress against this month's targets</CardDescription>
+        <CardTitle className="text-lg">Goals · {label}</CardTitle>
+        <CardDescription>Team progress against targets</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {goals.map((g) => {
-          const pct = Math.min(100, (g.value / g.target) * 100);
+          const value = g.unit === "%" ? g.value : scale(g.value);
+          const pct = Math.min(100, (value / g.target) * 100);
           const onTrack = pct >= 75;
           return (
             <div key={g.id}>
               <div className="flex justify-between items-baseline mb-1.5">
                 <span className="text-sm font-medium">{g.label}</span>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  <span className="text-foreground font-semibold">{g.value}{g.unit}</span> / {g.target}{g.unit}
+                  <span className="text-foreground font-semibold">{value}{g.unit}</span> / {g.target}{g.unit}
                 </span>
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden">
