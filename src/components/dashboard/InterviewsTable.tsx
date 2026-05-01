@@ -10,6 +10,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import { interviews, type InterviewStatus } from "@/data/dashboardMock";
 import { Video, MapPin, Phone } from "lucide-react";
+import { useDateRange } from "@/lib/dateRange";
 
 const statusSx: Record<InterviewStatus, { bg: string; color: string; border: string }> = {
   Scheduled: { bg: "hsl(var(--primary) / 0.15)", color: "hsl(var(--primary))", border: "hsl(var(--primary) / 0.3)" },
@@ -31,6 +32,13 @@ const formatWhen = (iso: string) =>
   });
 
 const InterviewsTable = () => {
+  const { range, factor } = useDateRange();
+  // Mock dates are clustered in April 2026; for date ranges that don't intersect
+  // we fall back to a proportional slice so the table still reflects the range.
+  const visible =
+    range === "all"
+      ? interviews
+      : interviews.slice(0, Math.max(1, Math.round(interviews.length * factor)));
   return (
     <Card>
       <CardHeader
@@ -54,7 +62,7 @@ const InterviewsTable = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {interviews.map((iv) => {
+            {visible.map((iv) => {
               const ModeIcon = modeIcon[iv.mode];
               const s = statusSx[iv.status];
               return (
