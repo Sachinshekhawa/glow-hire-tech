@@ -110,15 +110,17 @@ const ForgotPassword = () => {
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 255 } }}
                   required
                   autoFocus
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                      </InputAdornment>
-                    ),
+                  slotProps={{
+                    htmlInput: { maxLength: 255 },
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                        </InputAdornment>
+                      ),
+                    },
                   }}
                 />
               </div>
