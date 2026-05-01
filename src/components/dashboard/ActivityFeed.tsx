@@ -4,6 +4,7 @@ import CardContent from "@mui/material/CardContent";
 import { Award, CalendarClock, Bot, Send, Briefcase } from "lucide-react";
 import { activity } from "@/data/dashboardMock";
 import { cn } from "@/lib/utils";
+import { useDateRange } from "@/lib/dateRange";
 
 const iconMap = {
   offer: { Icon: Award, color: "text-emerald-500 bg-emerald-500/15" },
@@ -14,6 +15,9 @@ const iconMap = {
 };
 
 const ActivityFeed = () => {
+  const { range, factor } = useDateRange();
+  const visible =
+    range === "all" ? activity : activity.slice(0, Math.max(1, Math.round(activity.length * factor)));
   return (
     <Card>
       <CardHeader
@@ -22,7 +26,7 @@ const ActivityFeed = () => {
       />
       <CardContent>
         <ol className="relative space-y-4 before:absolute before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-border">
-          {activity.map((e) => {
+          {visible.map((e) => {
             const meta = iconMap[e.kind];
             const Icon = meta.Icon;
             return (

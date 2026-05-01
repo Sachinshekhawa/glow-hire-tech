@@ -4,6 +4,7 @@ import CardContent from "@mui/material/CardContent";
 import Avatar from "@mui/material/Avatar";
 import Chip from "@mui/material/Chip";
 import { submissions } from "@/data/dashboardMock";
+import { useDateRange } from "@/lib/dateRange";
 
 const stageChip: Record<string, { bg: string; color: string; border: string }> = {
   Submitted: { bg: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", border: "hsl(var(--border))" },
@@ -18,6 +19,14 @@ const initials = (name: string) =>
   name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
 const SubmissionsCard = () => {
+  const { range, factor, filterByDate } = useDateRange();
+  const filtered = filterByDate(submissions, (s) => s.submittedAt);
+  const visible =
+    range === "all"
+      ? submissions
+      : filtered.length
+        ? filtered
+        : submissions.slice(0, Math.max(1, Math.round(submissions.length * factor)));
   return (
     <Card>
       <CardHeader
@@ -25,7 +34,7 @@ const SubmissionsCard = () => {
         subheader={<span className="text-sm text-muted-foreground">Candidates submitted to clients</span>}
       />
       <CardContent className="space-y-2">
-        {submissions.map((s) => {
+        {visible.map((s) => {
           const c = stageChip[s.stage];
           return (
             <div
