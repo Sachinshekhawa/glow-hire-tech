@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Sparkles, Mail, Lock, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Eye, EyeOff, Sparkles, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import CircularProgress from "@mui/material/CircularProgress";
 import { toast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -41,26 +45,27 @@ const SignIn = () => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      toast({
-        title: "Welcome back 👋",
-        description: "Signed in successfully (demo mode).",
-      });
+      toast({ title: "Welcome back 👋", description: "Signed in successfully (demo mode)." });
       navigate("/dashboard");
     }, 900);
   };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background px-4 py-10">
-      {/* Ambient glow */}
+      {/* Animated ambient blobs */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-primary/20 blur-[120px]" />
-        <div className="absolute bottom-[-15%] right-[-10%] h-[500px] w-[500px] rounded-full bg-accent/20 blur-[120px]" />
+        <div className="absolute top-[-10%] left-[-10%] h-[520px] w-[520px] rounded-full bg-primary/25 blur-[120px] animate-float" />
+        <div
+          className="absolute bottom-[-15%] right-[-10%] h-[520px] w-[520px] rounded-full bg-accent/25 blur-[120px] animate-float"
+          style={{ animationDelay: "1.5s" }}
+        />
+        <div className="absolute inset-0 grid-pattern opacity-30" />
       </div>
 
       {/* Top bar */}
-      <div className="absolute top-0 inset-x-0 px-6 py-5 flex items-center justify-between">
+      <div className="absolute top-0 inset-x-0 px-6 py-5 flex items-center justify-between animate-fade-up">
         <Link to="/" className="flex items-center gap-2 group">
-          <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
+          <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow animate-glow-pulse">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </span>
           <span className="font-display text-xl font-bold tracking-tight">
@@ -70,11 +75,31 @@ const SignIn = () => {
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md">
-        <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-xl shadow-elegant p-8 md:p-10">
-          <div className="mb-8 text-center">
+      <div className="w-full max-w-md animate-fade-up" style={{ animationDelay: "0.1s" }}>
+        <Box
+          sx={{
+            position: "relative",
+            borderRadius: 3,
+            border: "1px solid hsl(var(--border))",
+            background: "var(--gradient-card)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            boxShadow: "var(--shadow-elegant)",
+            p: { xs: 3.5, md: 5 },
+            overflow: "hidden",
+          }}
+          className="glow-border"
+        >
+          {/* Inner glow accent */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+
+          <div className="mb-7 text-center animate-fade-up" style={{ animationDelay: "0.2s" }}>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-4 rounded-full border border-border bg-card/60 text-xs font-medium text-muted-foreground">
+              <ShieldCheck className="h-3 w-3 text-primary" />
+              Secure sign-in
+            </div>
             <h1 className="font-display text-3xl font-bold tracking-tight">
-              Welcome back
+              Welcome <span className="gradient-text">back</span>
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Sign in to your Glohire workspace
@@ -82,111 +107,131 @@ const SignIn = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  maxLength={255}
-                  className="pl-10 h-11"
-                  required
-                />
-              </div>
+            <div className="animate-fade-up" style={{ animationDelay: "0.3s" }}>
+              <TextField
+                label="Email"
+                type="email"
+                fullWidth
+                autoComplete="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                inputProps={{ maxLength: 255 }}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    toast({
-                      title: "Password reset",
-                      description: "Reset flow available once auth is connected.",
-                    })
-                  }
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            <div className="animate-fade-up" style={{ animationDelay: "0.4s" }}>
+              <TextField
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                fullWidth
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                inputProps={{ maxLength: 128 }}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <div className="flex justify-end mt-2">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors story-link"
                 >
                   Forgot password?
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  maxLength={128}
-                  className="pl-10 pr-10 h-11"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
+                </Link>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="remember"
-                checked={remember}
-                onCheckedChange={(c) => setRemember(Boolean(c))}
-              />
-              <Label
-                htmlFor="remember"
-                className="text-sm text-muted-foreground font-normal cursor-pointer"
-              >
-                Keep me signed in for 30 days
-              </Label>
-            </div>
-
-            <Button
-              type="submit"
-              variant="hero"
-              size="lg"
-              className="w-full"
-              disabled={loading}
+            <div
+              className="flex items-center animate-fade-up"
+              style={{ animationDelay: "0.5s" }}
             >
-              {loading ? (
-                "Signing in..."
-              ) : (
-                <>
-                  Sign in <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={
+                  <span className="text-sm text-muted-foreground">
+                    Keep me signed in for 30 days
+                  </span>
+                }
+              />
+            </div>
+
+            <div className="animate-fade-up" style={{ animationDelay: "0.6s" }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                size="large"
+                fullWidth
+                disabled={loading}
+                endIcon={
+                  loading ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )
+                }
+                sx={{ height: 48, fontSize: 15 }}
+              >
+                {loading ? "Signing in…" : "Sign in"}
+              </Button>
+            </div>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div
+            className="mt-6 text-center text-sm text-muted-foreground animate-fade-up"
+            style={{ animationDelay: "0.7s" }}
+          >
             New to Glohire?{" "}
             <Link
               to="/#cta"
-              className="text-foreground font-medium hover:text-primary transition-colors"
+              className="text-foreground font-medium hover:text-primary transition-colors story-link"
             >
               Book a demo
             </Link>
           </div>
-        </div>
+        </Box>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
+        <p
+          className="mt-6 text-center text-xs text-muted-foreground animate-fade-up"
+          style={{ animationDelay: "0.8s" }}
+        >
           Protected by enterprise-grade encryption · SOC 2 · GDPR
         </p>
       </div>
