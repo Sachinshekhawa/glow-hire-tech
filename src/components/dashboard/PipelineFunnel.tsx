@@ -3,6 +3,7 @@ import CardHeader from "@mui/material/CardHeader";
 import CardContent from "@mui/material/CardContent";
 import LinearProgress from "@mui/material/LinearProgress";
 import { pipelineFunnel } from "@/data/dashboardMock";
+import { useDateRange } from "@/lib/dateRange";
 
 type Props = {
   data?: { stage: string; count: number }[];
@@ -11,11 +12,13 @@ type Props = {
 };
 
 const PipelineFunnel = ({
-  data = pipelineFunnel,
+  data: rawData = pipelineFunnel,
   title = "Hiring pipeline",
   description = "Candidate progression across stages",
 }: Props) => {
-  const max = Math.max(...data.map((s) => s.count));
+  const { scale } = useDateRange();
+  const data = rawData.map((s) => ({ ...s, count: scale(s.count) }));
+  const max = Math.max(...data.map((s) => s.count), 1);
 
   return (
     <Card>
