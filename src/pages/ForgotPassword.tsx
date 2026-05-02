@@ -8,13 +8,14 @@ import InputAdornment from "@mui/material/InputAdornment";
 import CircularProgress from "@mui/material/CircularProgress";
 import { toast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
+import { supabase } from "@/integrations/supabase/client";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
@@ -27,14 +28,21 @@ const ForgotPassword = () => {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
       setSent(true);
       toast({
         title: "Reset link sent",
         description: "Check your inbox for instructions to reset your password.",
       });
-    }, 1000);
+    } catch (err: any) {
+      toast({ title: "Couldn't send reset link", description: err?.message || "Try again", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
