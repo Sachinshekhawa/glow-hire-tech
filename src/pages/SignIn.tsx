@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Sparkles, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, Sparkles, Mail, Lock, ArrowRight, ShieldCheck, User as UserIcon } from "lucide-react";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
@@ -9,45 +9,75 @@ import InputAdornment from "@mui/material/InputAdornment";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import CircularProgress from "@mui/material/CircularProgress";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
 import { toast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const from = (location.state as any)?.from || "/dashboard";
 
+  useEffect(() => {
+    if (user) navigate(from, { replace: true });
+  }, [user, from, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      toast({
-        title: "Missing details",
-        description: "Please enter both your email and password.",
-        variant: "destructive",
-      });
+      toast({ title: "Missing details", description: "Please enter both your email and password.", variant: "destructive" });
       return;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
       return;
     }
-
+    if (password.length < 6) {
+      toast({ title: "Password too short", description: "Use at least 6 characters.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (tab === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error;
+        toast({ title: "Welcome back 👋", description: "Signed in successfully." });
+        navigate(from, { replace: true });
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+            data: { display_name: displayName.trim() || email.split("@")[0] },
+          },
+        });
+        if (error) throw error;
+        toast({ title: "Account created", description: "Check your inbox to verify your email, then sign in." });
+        setTab("signin");
+      }
+    } catch (err: any) {
+      toast({
+        title: tab === "signin" ? "Sign-in failed" : "Sign-up failed",
+        description: err?.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-      toast({ title: "Welcome back 👋", description: "Signed in successfully (demo mode)." });
-      navigate("/dashboard");
-    }, 900);
+    }
   };
 
   return (
