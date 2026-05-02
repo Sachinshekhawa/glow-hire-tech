@@ -1,1 +1,4 @@
 project_id = "nqynticlgaobamzsbvqv"
+
+[functions.job-ai]
+verify_jwt = false
