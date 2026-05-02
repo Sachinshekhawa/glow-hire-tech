@@ -275,7 +275,7 @@ const SignIn = () => {
                 }
                 sx={{ height: 48, fontSize: 15 }}
               >
-                {loading ? "Signing in…" : "Sign in"}
+                {loading ? (tab === "signin" ? "Signing in…" : "Creating account…") : tab === "signin" ? "Sign in" : "Create account"}
               </Button>
             </div>
           </form>
@@ -284,13 +284,21 @@ const SignIn = () => {
             className="mt-6 text-center text-sm text-muted-foreground animate-fade-up"
             style={{ animationDelay: "0.7s" }}
           >
-            New to Glohire?{" "}
-            <Link
-              to="/#cta"
-              className="text-foreground font-medium hover:text-primary transition-colors story-link"
-            >
-              Book a demo
-            </Link>
+            {tab === "signin" ? (
+              <>
+                New to Glohire?{" "}
+                <button type="button" onClick={() => setTab("signup")} className="text-foreground font-medium hover:text-primary transition-colors story-link">
+                  Create an account
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button type="button" onClick={() => setTab("signin")} className="text-foreground font-medium hover:text-primary transition-colors story-link">
+                  Sign in
+                </button>
+              </>
+            )}
           </div>
         </Box>
 
