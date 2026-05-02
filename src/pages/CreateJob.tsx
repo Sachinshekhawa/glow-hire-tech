@@ -218,6 +218,9 @@ const CreateJob = () => {
   const [autoFilledIds, setAutoFilledIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<CreateMode | "select">("select");
   const [jdOverride, setJdOverride] = useState<string | null>(null);
+  const [savedJobId, setSavedJobId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Eligible job-question pipeline
