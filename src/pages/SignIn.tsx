@@ -129,15 +129,47 @@ const SignIn = () => {
               Secure sign-in
             </div>
             <h1 className="font-display text-3xl font-bold tracking-tight">
-              Welcome <span className="gradient-text">back</span>
+              {tab === "signin" ? <>Welcome <span className="gradient-text">back</span></> : <>Create your <span className="gradient-text">account</span></>}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Sign in to your Glohire workspace
+              {tab === "signin" ? "Sign in to your Glohire workspace" : "Get started with Glohire in seconds"}
             </p>
           </div>
 
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            variant="fullWidth"
+            sx={{ mb: 3, "& .MuiTab-root": { textTransform: "none", fontWeight: 600 } }}
+          >
+            <Tab value="signin" label="Sign in" />
+            <Tab value="signup" label="Sign up" />
+          </Tabs>
+
           <form onSubmit={handleSubmit} className="space-y-5">
+            {tab === "signup" && (
+              <div className="animate-fade-up">
+                <TextField
+                  label="Display name"
+                  fullWidth
+                  placeholder="e.g. Aarav Mehta"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  slotProps={{
+                    htmlInput: { maxLength: 80 },
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <UserIcon className="h-4 w-4 text-muted-foreground" />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </div>
+            )}
             <div className="animate-fade-up" style={{ animationDelay: "0.3s" }}>
+
               <TextField
                 label="Email"
                 type="email"
