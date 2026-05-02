@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Bot,
@@ -57,6 +57,7 @@ import { loadClientQuestions } from "@/data/clientQuestionsStore";
 import { ModeSelect, type CreateMode } from "@/components/createjob/ModeSelect";
 import { PromptMode } from "@/components/createjob/PromptMode";
 import { UploadMode } from "@/components/createjob/UploadMode";
+import { createJob } from "@/data/jobsApi";
 
 type Phase = "job" | "client";
 
