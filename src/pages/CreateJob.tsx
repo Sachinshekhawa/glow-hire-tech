@@ -384,6 +384,67 @@ const CreateJob = () => {
     });
   }, [messages, currentJobQuestion, currentClientQuestion]);
 
+  // Persist the job to the backend once both phases are completed.
+  useEffect(() => {
+    if (!completed || savedJobId || saving) return;
+    const title = (answers["q-1"] as string) || "Untitled role";
+    const employment = (answers["q-5"] as string) || null;
+    const location = (answers["q-6"] as string) || null;
+    const salary = (answers["q-7"] as string) || null;
+    const positionsRaw = answers["q-8"];
+    const positions = Number(positionsRaw) > 0 ? Number(positionsRaw) : 1;
+    const skillsRaw = answers["q-4"];
+    const skills = Array.isArray(skillsRaw)
+      ? (skillsRaw as string[])
+      : typeof skillsRaw === "string" && skillsRaw
+        ? skillsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+    const experience = (answers["q-3"] as string) || null;
+    const jdMessage = [...messages].reverse().find((m: any) => m.kind === "jd");
+    const jd = jdOverride || (jdMessage as any)?.text || null;
+
+    // Resolve client display name from client_picker
+    let clientName: string | null = null;
+    const clientPickerQ = clientQuestions.find((q) => q.inputType === "client_picker");
+    if (clientPickerQ) {
+      const cid = clientAnswers[clientPickerQ.id];
+      if (typeof cid === "string") {
+        const c = clients.find((x) => x.id === cid);
+        clientName = c?.name || null;
+      }
+    }
+
+    setSaving(true);
+    createJob({
+      title,
+      client: clientName,
+      location,
+      employment_type: employment,
+      positions,
+      experience,
+      skills,
+      salary,
+      jd_markdown: jd,
+      source: mode === "chat" ? "chat" : mode === "prompt" ? "prompt" : "upload",
+      answers: answers as any,
+      client_answers: clientAnswers as any,
+      status: "Open",
+      priority: "Medium",
+    })
+      .then((row) => {
+        setSavedJobId(row.id);
+        toast({ title: "Job saved", description: `${row.title} is now live in your jobs list.` });
+      })
+      .catch((err) => {
+        toast({
+          title: "Couldn't save job",
+          description: err?.message || "You may need to sign in again.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => setSaving(false));
+  }, [completed, savedJobId, saving, answers, clientAnswers, clients, clientQuestions, jdOverride, messages, mode, toast]);
+
   // Resolve the selected client id from client answers — needed for poc_picker
   const selectedClientIdForPoc = useMemo(() => {
     const clientPickerQ = clientQuestions.find(
