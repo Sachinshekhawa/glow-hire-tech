@@ -116,18 +116,19 @@ export const createJob = async (input: {
   const uid = userData.user?.id;
   if (!uid) throw new Error("Not signed in");
 
+  const payload = {
+    ...input,
+    created_by: uid,
+    priority: input.priority ?? "Medium",
+    status: input.status ?? "Open",
+    positions: input.positions ?? 1,
+    skills: input.skills ?? [],
+    answers: (input.answers ?? {}) as any,
+    client_answers: (input.client_answers ?? {}) as any,
+  };
   const { data, error } = await supabase
     .from("jobs")
-    .insert({
-      ...input,
-      created_by: uid,
-      priority: input.priority ?? "Medium",
-      status: input.status ?? "Open",
-      positions: input.positions ?? 1,
-      skills: input.skills ?? [],
-      answers: input.answers ?? {},
-      client_answers: input.client_answers ?? {},
-    })
+    .insert(payload as any)
     .select("*")
     .single();
   if (error) throw error;
