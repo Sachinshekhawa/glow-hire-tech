@@ -163,7 +163,7 @@ export const listSubmissions = async (jobId: string) => {
   return (data || []) as SubmissionRow[];
 };
 
-export const addSubmission = async (input: Omit<SubmissionRow, "id" | "created_at" | "updated_at" | "created_by">) => {
+export const addSubmission = async (input: Partial<Omit<SubmissionRow, "id" | "created_at" | "updated_at" | "created_by">> & { job_id: string; candidate_name: string }) => {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Not signed in");
   const { data, error } = await supabase
