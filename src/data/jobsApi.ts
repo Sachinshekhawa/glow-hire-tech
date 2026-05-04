@@ -61,6 +61,8 @@ export type SubmissionRow = {
   score: number | null;
   stage: SubmissionStage;
   notes: string | null;
+  reject_reason: string | null;
+  reject_reason_color: string | null;
   created_at: string;
   updated_at: string;
 };
