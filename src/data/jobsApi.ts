@@ -178,6 +178,90 @@ export const updateSubmissionStage = async (id: string, stage: SubmissionStage) 
   if (error) throw error;
 };
 
+export const updateSubmission = async (id: string, patch: Partial<SubmissionRow>) => {
+  const { data, error } = await supabase
+    .from("job_submissions")
+    .update(patch as any)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as SubmissionRow;
+};
+
+export const deleteSubmission = async (id: string) => {
+  const { error } = await supabase.from("job_submissions").delete().eq("id", id);
+  if (error) throw error;
+};
+
+// ---------- Candidates library ----------
+export type CandidateRow = {
+  id: string;
+  created_by: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  resume_url: string;
+  resume_filename: string | null;
+  resume_path: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const listCandidates = async () => {
+  const { data, error } = await supabase
+    .from("candidates")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as CandidateRow[];
+};
+
+export const deleteCandidate = async (id: string, resume_path?: string | null) => {
+  if (resume_path) {
+    await supabase.storage.from("resumes").remove([resume_path]).catch(() => null);
+  }
+  const { error } = await supabase.from("candidates").delete().eq("id", id);
+  if (error) throw error;
+};
+
+/** Upload a single resume file and create a candidates row. */
+export const uploadResumeAndCreateCandidate = async (file: File) => {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Not signed in");
+  const uid = u.user.id;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+  const path = `${uid}/${Date.now()}_${safeName}`;
+  const { error: upErr } = await supabase.storage.from("resumes").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type || undefined,
+  });
+  if (upErr) throw upErr;
+  const { data: signed } = await supabase.storage.from("resumes").createSignedUrl(path, 60 * 60 * 24 * 7);
+  const url = signed?.signedUrl || "";
+  const fullName = file.name.replace(/\.[^.]+$/, "").replace(/[._-]+/g, " ").trim() || "Candidate";
+  const { data, error } = await supabase
+    .from("candidates")
+    .insert({
+      created_by: uid,
+      full_name: fullName,
+      resume_url: url,
+      resume_filename: file.name,
+      resume_path: path,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as CandidateRow;
+};
+
+export const refreshResumeUrl = async (path: string) => {
+  const { data } = await supabase.storage.from("resumes").createSignedUrl(path, 60 * 60 * 24 * 7);
+  return data?.signedUrl || "";
+};
+
 export const listInterviews = async (jobId: string) => {
   const { data, error } = await supabase
     .from("job_interviews")
