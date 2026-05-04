@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      candidates: {
+        Row: {
+          created_at: string
+          created_by: string
+          email: string | null
+          full_name: string
+          id: string
+          notes: string | null
+          phone: string | null
+          resume_filename: string | null
+          resume_path: string | null
+          resume_url: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          email?: string | null
+          full_name: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_url: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       job_interviews: {
         Row: {
           candidate_name: string
@@ -87,6 +129,8 @@ export type Database = {
           id: string
           job_id: string
           notes: string | null
+          reject_reason: string | null
+          reject_reason_color: string | null
           resume_url: string | null
           score: number | null
           stage: string
@@ -101,6 +145,8 @@ export type Database = {
           id?: string
           job_id: string
           notes?: string | null
+          reject_reason?: string | null
+          reject_reason_color?: string | null
           resume_url?: string | null
           score?: number | null
           stage?: string
@@ -115,6 +161,8 @@ export type Database = {
           id?: string
           job_id?: string
           notes?: string | null
+          reject_reason?: string | null
+          reject_reason_color?: string | null
           resume_url?: string | null
           score?: number | null
           stage?: string
