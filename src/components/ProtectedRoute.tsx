@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useAuth } from "@/hooks/useAuth";
+import FloatingChatbot from "@/components/FloatingChatbot";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { user, loading } = useAuth();
@@ -19,7 +20,12 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     return <Navigate to="/signin" state={{ from: location.pathname + location.search }} replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <FloatingChatbot />
+    </>
+  );
 };
 
 export default ProtectedRoute;
