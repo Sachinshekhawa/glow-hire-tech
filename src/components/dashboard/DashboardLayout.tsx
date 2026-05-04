@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 const nav = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
   { label: "Jobs", to: "/jobs", icon: Briefcase },
-  { label: "Candidates", to: "/dashboard?tab=candidates", icon: Users },
+  { label: "Candidates", to: "/candidates", icon: Users },
   { label: "Interviews", to: "/dashboard?tab=interviews", icon: CalendarClock },
   { label: "AI Interviews", to: "/dashboard?tab=ai", icon: Bot },
   { label: "Submissions", to: "/dashboard?tab=submissions", icon: Send },
