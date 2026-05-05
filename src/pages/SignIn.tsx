@@ -1,19 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  Eye,
-  EyeOff,
-  Sparkles,
-  Mail,
-  Lock,
-  ArrowRight,
-  ShieldCheck,
-  Bot,
-  Zap,
-  Users,
-  BarChart3,
-  CheckCircle2,
-} from "lucide-react";
+import { Eye, EyeOff, Sparkles, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,30 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
-
-const capabilities = [
-  {
-    icon: Bot,
-    title: "AI Job Intelligence",
-    desc: "Auto-generate JDs, screening questions and candidate summaries.",
-  },
-  {
-    icon: Users,
-    title: "Smart Candidate Pipeline",
-    desc: "Bulk-upload resumes and let AI shortlist the best matches.",
-  },
-  {
-    icon: BarChart3,
-    title: "Live Recruiter Dashboards",
-    desc: "Track submissions, interviews and offers in real time.",
-  },
-  {
-    icon: Zap,
-    title: "Automated Interview Scheduling",
-    desc: "Coordinate panels and reminders without the back-and-forth.",
-  },
-];
 
 const SignIn = () => {
   const navigate = useNavigate();
@@ -56,7 +19,8 @@ const SignIn = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [activeCap, setActiveCap] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
   const from = (location.state as any)?.from || "/dashboard";
 
@@ -64,81 +28,110 @@ const SignIn = () => {
     if (user) navigate(from, { replace: true });
   }, [user, from, navigate]);
 
+  // Animated aurora canvas
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    const id = window.setInterval(
-      () => setActiveCap((i) => (i + 1) % capabilities.length),
-      3500,
-    );
-    return () => window.clearInterval(id);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let raf = 0;
+    const resize = () => {
+      canvas.width = canvas.offsetWidth * devicePixelRatio;
+      canvas.height = canvas.offsetHeight * devicePixelRatio;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const orbs = Array.from({ length: 6 }).map((_, i) => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.25 + Math.random() * 0.35,
+      hue: i % 2 === 0 ? 187 : 265,
+      vx: (Math.random() - 0.5) * 0.0008,
+      vy: (Math.random() - 0.5) * 0.0008,
+    }));
+
+    const render = () => {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+      orbs.forEach((o) => {
+        o.x += o.vx;
+        o.y += o.vy;
+        if (o.x < -0.2 || o.x > 1.2) o.vx *= -1;
+        if (o.y < -0.2 || o.y > 1.2) o.vy *= -1;
+        const cx = o.x * w;
+        const cy = o.y * h;
+        const radius = o.r * Math.max(w, h);
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        grad.addColorStop(0, `hsla(${o.hue}, 100%, 60%, 0.45)`);
+        grad.addColorStop(1, `hsla(${o.hue}, 100%, 60%, 0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      raf = requestAnimationFrame(render);
+    };
+    render();
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const el = cardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 8;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -8;
+    setTilt({ x: y, y: x });
+  };
+  const resetTilt = () => setTilt({ x: 0, y: 0 });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      toast({
-        title: "Missing details",
-        description: "Please enter both your email and password.",
-        variant: "destructive",
-      });
+      toast({ title: "Missing details", description: "Enter email and password.", variant: "destructive" });
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast({ title: "Invalid email", variant: "destructive" });
       return;
     }
     if (password.length < 6) {
-      toast({
-        title: "Password too short",
-        description: "Use at least 6 characters.",
-        variant: "destructive",
-      });
+      toast({ title: "Password too short", description: "Use at least 6 characters.", variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) throw error;
-      toast({ title: "Welcome back 👋", description: "Signed in successfully." });
+      toast({ title: "Welcome back 👋" });
       navigate(from, { replace: true });
     } catch (err: any) {
-      toast({
-        title: "Sign-in failed",
-        description: err?.message || "Something went wrong",
-        variant: "destructive",
-      });
+      toast({ title: "Sign-in failed", description: err?.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      {/* Animated ambient blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute top-[-15%] left-[-10%] h-[560px] w-[560px] rounded-full bg-primary/25 blur-[130px] animate-float" />
-        <div
-          className="absolute bottom-[-20%] right-[-10%] h-[560px] w-[560px] rounded-full bg-accent/25 blur-[130px] animate-float"
-          style={{ animationDelay: "1.5s" }}
-        />
-        <div
-          className="absolute top-1/3 left-1/2 h-[300px] w-[300px] -translate-x-1/2 rounded-full bg-primary-glow/15 blur-[100px] animate-float"
-          style={{ animationDelay: "3s" }}
-        />
-        <div className="absolute inset-0 grid-pattern opacity-30" />
-      </div>
+    <div className="relative min-h-screen overflow-hidden bg-background flex items-center justify-center px-4 py-10">
+      {/* Aurora canvas */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full -z-10 opacity-80" />
+      {/* Grid pattern */}
+      <div className="absolute inset-0 grid-pattern opacity-40 -z-10" />
+      {/* Vignette */}
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,transparent_30%,hsl(var(--background))_85%)]" />
 
       {/* Top bar */}
-      <div className="absolute top-0 inset-x-0 z-10 px-6 py-5 flex items-center justify-between animate-fade-up">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary shadow-glow animate-glow-pulse">
+      <div className="absolute top-0 inset-x-0 z-10 px-6 py-5 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2 group animate-fade-up">
+          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow animate-glow-pulse">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </span>
           <span className="font-display text-xl font-bold tracking-tight">
@@ -148,229 +141,156 @@ const SignIn = () => {
         <ThemeToggle />
       </div>
 
-      <div className="container mx-auto min-h-screen grid lg:grid-cols-2 gap-10 items-center px-4 py-24">
-        {/* LEFT — Product showcase */}
-        <div className="hidden lg:flex flex-col justify-center animate-fade-up" style={{ animationDelay: "0.05s" }}>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-5 rounded-full border border-border bg-card/60 text-xs font-medium text-muted-foreground w-fit">
-            <Sparkles className="h-3 w-3 text-primary" />
-            AI-native ATS for modern recruiters
-          </div>
-
-          <h2 className="font-display text-4xl xl:text-5xl font-bold tracking-tight leading-[1.1]">
-            Hire <span className="gradient-text">smarter</span>,
-            <br /> ship roles <span className="gradient-text">faster</span>.
-          </h2>
-          <p className="mt-4 text-muted-foreground max-w-md">
-            Glohire unifies your jobs, candidates and interviews into one
-            intelligent workspace — powered by AI that actually understands
-            recruiting.
-          </p>
-
-          {/* Capability carousel */}
-          <div className="mt-10 space-y-3 max-w-md">
-            {capabilities.map((cap, i) => {
-              const Icon = cap.icon;
-              const active = i === activeCap;
-              return (
-                <button
-                  key={cap.title}
-                  type="button"
-                  onClick={() => setActiveCap(i)}
-                  className={cn(
-                    "w-full text-left flex items-start gap-3 rounded-xl border p-4 transition-all duration-500",
-                    active
-                      ? "border-primary/40 bg-card/80 shadow-glow scale-[1.02]"
-                      : "border-border/60 bg-card/30 hover:bg-card/50",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-500",
-                      active
-                        ? "bg-gradient-primary text-primary-foreground shadow-glow"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold">{cap.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {cap.desc}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-8 flex items-center gap-6 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> SOC 2
-            </div>
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> GDPR ready
-            </div>
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> 99.9% uptime
-            </div>
-          </div>
+      {/* Sign-in card */}
+      <div
+        ref={cardRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={resetTilt}
+        style={{
+          transform: `perspective(1200px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transition: "transform 0.25s ease-out",
+        }}
+        className="relative w-full max-w-md animate-fade-up"
+      >
+        {/* Animated conic ring */}
+        <div className="absolute -inset-[1.5px] rounded-3xl overflow-hidden">
+          <div
+            className="absolute inset-[-100%] opacity-70"
+            style={{
+              background:
+                "conic-gradient(from 0deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary-glow)), hsl(var(--accent-glow)), hsl(var(--primary)))",
+              animation: "spin 8s linear infinite",
+            }}
+          />
         </div>
 
-        {/* RIGHT — Sign-in card */}
         <div
-          className="w-full max-w-md mx-auto lg:mx-0 lg:ml-auto animate-fade-up"
-          style={{ animationDelay: "0.15s" }}
+          className="relative rounded-3xl border border-border/60 bg-card/70 backdrop-blur-2xl p-8 md:p-10 shadow-elegant overflow-hidden"
+          style={{ background: "var(--gradient-card)" }}
         >
-          <div
-            className="glow-border relative rounded-2xl border border-border bg-card/60 backdrop-blur-xl p-8 md:p-10 shadow-elegant overflow-hidden"
-            style={{ background: "var(--gradient-card)" }}
-          >
-            {/* top accent line */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
-            {/* corner shimmer */}
-            <div
-              className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/20 blur-3xl animate-glow-pulse"
-            />
+          {/* Sparkle dots */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+            {Array.from({ length: 18 }).map((_, i) => (
+              <span
+                key={i}
+                className="absolute h-1 w-1 rounded-full bg-primary/60"
+                style={{
+                  top: `${(i * 53) % 100}%`,
+                  left: `${(i * 37) % 100}%`,
+                  animation: `float ${4 + (i % 5)}s ease-in-out ${i * 0.2}s infinite`,
+                  opacity: 0.4 + ((i % 5) * 0.1),
+                  filter: "blur(0.5px)",
+                }}
+              />
+            ))}
+          </div>
 
-            <div className="mb-7 text-center">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-4 rounded-full border border-border bg-card/60 text-xs font-medium text-muted-foreground">
-                <ShieldCheck className="h-3 w-3 text-primary" />
-                Secure sign-in
-              </div>
-              <h1 className="font-display text-3xl font-bold tracking-tight">
-                Welcome <span className="gradient-text">back</span>
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Sign in to your Glohire workspace
-              </p>
+          <div className="relative mb-8 text-center">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-5 rounded-full border border-primary/30 bg-primary/5 text-xs font-medium text-primary animate-fade-up">
+              <ShieldCheck className="h-3 w-3" />
+              Secure sign-in
             </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div
-                className="space-y-2 animate-fade-up"
-                style={{ animationDelay: "0.25s" }}
-              >
-                <Label htmlFor="email">Email</Label>
-                <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    maxLength={255}
-                    required
-                    className="pl-9 h-11 bg-background/60 border-border/70 focus-visible:border-primary/60 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div
-                className="space-y-2 animate-fade-up"
-                style={{ animationDelay: "0.35s" }}
-              >
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    to="/forgot-password"
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors story-link"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    maxLength={128}
-                    required
-                    className="pl-9 pr-10 h-11 bg-background/60 border-border/70 focus-visible:border-primary/60 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className="flex items-center gap-2 animate-fade-up"
-                style={{ animationDelay: "0.45s" }}
-              >
-                <Checkbox
-                  id="remember"
-                  checked={remember}
-                  onCheckedChange={(v) => setRemember(Boolean(v))}
-                />
-                <Label
-                  htmlFor="remember"
-                  className="text-sm text-muted-foreground font-normal cursor-pointer"
-                >
-                  Keep me signed in for 30 days
-                </Label>
-              </div>
-
-              <div
-                className="animate-fade-up"
-                style={{ animationDelay: "0.55s" }}
-              >
-                <Button
-                  type="submit"
-                  variant="hero"
-                  size="lg"
-                  disabled={loading}
-                  className="w-full h-12 group"
-                >
-                  {loading ? (
-                    <>
-                      <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
-                      Signing in…
-                    </>
-                  ) : (
-                    <>
-                      Sign in
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-
-            <p
-              className="mt-6 text-center text-xs text-muted-foreground animate-fade-up"
-              style={{ animationDelay: "0.65s" }}
-            >
-              Access by invitation only. Need an account?{" "}
-              <a
-                href="mailto:hello@glohire.ai"
-                className="text-foreground font-medium hover:text-primary transition-colors story-link"
-              >
-                Contact your admin
-              </a>
+            <h1 className="font-display text-4xl font-bold tracking-tight animate-fade-up" style={{ animationDelay: "0.1s" }}>
+              Welcome <span className="gradient-text animate-shimmer bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">back</span>
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground animate-fade-up" style={{ animationDelay: "0.15s" }}>
+              Sign in to your Glohire workspace
             </p>
           </div>
 
-          <p className="mt-5 text-center text-xs text-muted-foreground">
-            Protected by enterprise-grade encryption · SOC 2 · GDPR
+          <form onSubmit={handleSubmit} className="relative space-y-5">
+            <div className="space-y-2 animate-fade-up" style={{ animationDelay: "0.25s" }}>
+              <Label htmlFor="email">Email</Label>
+              <div className="relative group">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  maxLength={255}
+                  required
+                  className="pl-9 h-12 bg-background/50 border-border/70 focus-visible:border-primary/60 focus-visible:ring-primary/30 transition-all"
+                />
+                <span className="pointer-events-none absolute inset-x-2 bottom-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent scale-x-0 group-focus-within:scale-x-100 transition-transform duration-500" />
+              </div>
+            </div>
+
+            <div className="space-y-2 animate-fade-up" style={{ animationDelay: "0.35s" }}>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary transition-colors story-link">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative group">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  maxLength={128}
+                  required
+                  className="pl-9 pr-10 h-12 bg-background/50 border-border/70 focus-visible:border-primary/60 focus-visible:ring-primary/30 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <span className="pointer-events-none absolute inset-x-2 bottom-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent scale-x-0 group-focus-within:scale-x-100 transition-transform duration-500" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 animate-fade-up" style={{ animationDelay: "0.45s" }}>
+              <Checkbox id="remember" checked={remember} onCheckedChange={(v) => setRemember(Boolean(v))} />
+              <Label htmlFor="remember" className="text-sm text-muted-foreground font-normal cursor-pointer">
+                Keep me signed in for 30 days
+              </Label>
+            </div>
+
+            <div className="animate-fade-up" style={{ animationDelay: "0.55s" }}>
+              <Button type="submit" variant="hero" size="lg" disabled={loading} className="w-full h-12 group relative overflow-hidden">
+                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                    Signing in…
+                  </>
+                ) : (
+                  <>
+                    Sign in
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+
+          <p className="relative mt-7 text-center text-xs text-muted-foreground animate-fade-up" style={{ animationDelay: "0.65s" }}>
+            Access by invitation only. Need an account?{" "}
+            <a href="mailto:hello@glohire.ai" className="text-foreground font-medium hover:text-primary transition-colors story-link">
+              Contact your admin
+            </a>
           </p>
         </div>
+
+        <p className="mt-5 text-center text-[11px] text-muted-foreground/80 tracking-wider uppercase">
+          Enterprise-grade encryption · SOC 2 · GDPR
+        </p>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 };
