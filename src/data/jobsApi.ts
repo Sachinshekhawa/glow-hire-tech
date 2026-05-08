@@ -228,7 +228,7 @@ export const deleteCandidate = async (id: string, resume_path?: string | null) =
   if (error) throw error;
 };
 
-/** Upload a single resume file and create a candidates row. */
+/** Upload a single resume file and create a candidates row + V1 in the resume version history. */
 export const uploadResumeAndCreateCandidate = async (file: File) => {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Not signed in");
@@ -256,7 +256,22 @@ export const uploadResumeAndCreateCandidate = async (file: File) => {
     .select("*")
     .single();
   if (error) throw error;
+
+  // Kick off Resume Intelligence in background — V1 baseline + AI parse
+  try {
+    const { addResumeVersion } = await import("@/data/resumeIntel");
+    addResumeVersion(data.id, file).catch((e) => console.warn("V1 intel failed", e));
+  } catch (e) {
+    console.warn(e);
+  }
+
   return data as CandidateRow;
+};
+
+export const getCandidate = async (id: string) => {
+  const { data, error } = await supabase.from("candidates").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as CandidateRow | null;
 };
 
 export const refreshResumeUrl = async (path: string) => {

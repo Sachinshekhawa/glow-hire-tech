@@ -18,6 +18,7 @@ import CreateJob from "./pages/CreateJob.tsx";
 import Jobs from "./pages/Jobs.tsx";
 import JobDetail from "./pages/JobDetail.tsx";
 import Candidates from "./pages/Candidates.tsx";
+import CandidateDetail from "./pages/CandidateDetail.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
 import MuiThemeBridge from "./components/MuiThemeBridge";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
             <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
             <Route path="/candidates" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
+            <Route path="/candidates/:id" element={<ProtectedRoute><CandidateDetail /></ProtectedRoute>} />
             <Route path="/create-job" element={<ProtectedRoute><CreateJob /></ProtectedRoute>} />
             <Route path="/admin/system-behavior" element={<ProtectedRoute><SystemBehavior /></ProtectedRoute>} />
             <Route path="/admin/client-fields" element={<ProtectedRoute><ClientFieldsAdmin /></ProtectedRoute>} />

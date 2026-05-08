@@ -2,3 +2,9 @@ project_id = "nqynticlgaobamzsbvqv"
 
 [functions.job-ai]
 verify_jwt = false
+
+[functions.resume-intel]
+verify_jwt = false
+
+[functions.ai-chat]
+verify_jwt = false

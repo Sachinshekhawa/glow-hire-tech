@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Users, Upload, FileText, Trash2, Loader2, ExternalLink } from "lucide-react";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -173,14 +174,14 @@ const Candidates = () => {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <FileText className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <Link to={`/candidates/${c.id}`} className="min-w-0 flex-1 hover:opacity-80">
                     <p className="font-medium truncate">{c.full_name}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {c.resume_filename || "Resume"}
                     </p>
                     <div className="mt-2 flex items-center gap-1.5">
                       <Chip
-                        label="Resume"
+                        label="Resume Intelligence"
                         size="small"
                         variant="outlined"
                         sx={{ height: 20, fontSize: 10 }}
@@ -189,7 +190,7 @@ const Candidates = () => {
                         {new Date(c.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex flex-col gap-1">
                     <IconButton size="small" onClick={() => openResume(c)} title="Open resume">
                       <ExternalLink className="h-3.5 w-3.5" />
