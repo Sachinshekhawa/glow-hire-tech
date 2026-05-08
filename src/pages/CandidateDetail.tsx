@@ -174,6 +174,52 @@ const CandidateDetail = () => {
         <input ref={inputRef} type="file" accept={ACCEPT} hidden onChange={(e) => handleFile(e.target.files?.[0])} />
       </div>
 
+      {versions && versions.length > 0 && (() => {
+        const latest = versions[0];
+        const p = latest.parsed || {};
+        const detail = (label: string, value?: string | number | null) =>
+          value ? (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p className="text-sm mt-0.5">{value}</p>
+            </div>
+          ) : null;
+        return (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-primary" />
+                <h2 className="font-display text-lg font-semibold">Candidate details</h2>
+                <Chip label={`From V${latest.version}`} size="small" sx={{ ml: 1 }} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                {detail("Full name", p.full_name || candidate?.full_name)}
+                {detail("Email", p.email || candidate?.email)}
+                {detail("Phone", p.phone || candidate?.phone)}
+                {detail("Location", p.location)}
+                {detail("Total experience", p.total_experience_years ? `${p.total_experience_years} yrs` : undefined)}
+                {detail("Headline", p.headline)}
+              </div>
+              <ParsedView p={p} />
+              {p.projects?.length ? (
+                <div className="mt-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Projects</p>
+                  <ul className="space-y-1.5 text-sm">
+                    {p.projects.map((pr, i) => (
+                      <li key={i}>
+                        <span className="font-medium">{pr.name || "—"}</span>
+                        {pr.description ? <span className="text-muted-foreground"> · {pr.description}</span> : null}
+                        {pr.tech?.length ? <span className="text-xs text-muted-foreground"> [{pr.tech.join(", ")}]</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <div className="flex items-center gap-2 mb-3">
