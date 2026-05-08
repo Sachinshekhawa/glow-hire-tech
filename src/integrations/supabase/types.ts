@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      candidate_resume_versions: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          created_by: string
+          evolution_summary: Json
+          id: string
+          latest_changes: Json
+          parsed: Json
+          raw_text: string | null
+          resume_filename: string | null
+          resume_path: string | null
+          resume_url: string | null
+          summary: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          created_by: string
+          evolution_summary?: Json
+          id?: string
+          latest_changes?: Json
+          parsed?: Json
+          raw_text?: string | null
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_url?: string | null
+          summary?: string | null
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          created_by?: string
+          evolution_summary?: Json
+          id?: string
+          latest_changes?: Json
+          parsed?: Json
+          raw_text?: string | null
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_url?: string | null
+          summary?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_resume_versions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
           created_at: string
