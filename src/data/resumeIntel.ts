@@ -29,6 +29,23 @@ export type ParsedResume = {
 };
 
 export type LatestChanges = { headline: string; changes: ResumeChange[] };
+export type TrajectoryStop = {
+  company?: string; title?: string; start?: string; end?: string;
+  duration_months?: number; domain?: string; tech_focus?: string[];
+  is_transition?: boolean; transition_note?: string;
+};
+export type DomainShift = {
+  from_domain?: string; to_domain?: string; at_company?: string; date?: string;
+  tenure_in_new_role_months?: number; note?: string;
+};
+export type FitmentFlag = { severity: "info" | "warning" | "critical"; message: string };
+export type CareerTrajectory = {
+  timeline?: TrajectoryStop[];
+  domain_shifts?: DomainShift[];
+  current_role?: { title?: string; company?: string; domain?: string; tenure_months?: number; started?: string };
+  stability_score?: number;
+  fitment_flags?: FitmentFlag[];
+};
 export type EvolutionSummary = {
   headline: string;
   experience_growth?: string;
@@ -36,6 +53,7 @@ export type EvolutionSummary = {
   technology_evolution?: string;
   company_progression?: string;
   leadership_growth?: string;
+  career_trajectory?: CareerTrajectory;
 };
 
 export type ResumeVersionRow = {
