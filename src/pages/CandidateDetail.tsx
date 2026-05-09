@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Upload, FileText, Loader2, ExternalLink, Sparkles,
-  GitCompare, Plus, Minus, Pencil, Clock,
+  GitCompare, Plus, Minus, Pencil, Clock, TrendingUp, AlertTriangle, Info, ShieldAlert, Briefcase, ArrowRight,
 } from "lucide-react";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
