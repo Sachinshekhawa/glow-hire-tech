@@ -18,7 +18,20 @@ newest resume and (optionally) previously parsed prior versions. You must:
 4) Detect overall career evolution vs ALL prior versions (evolution_summary).
 
 Use semantic comparison — wording/order changes do not count as changes. Categorise each change as
-"added" | "removed" | "modified". Be specific (skill names, company names, etc.).`;
+"added" | "removed" | "modified". Be specific (skill names, company names, etc.).
+
+5) Build a CAREER TRAJECTORY analysis from the work history:
+   - For every job: compute tenure in months from start/end (treat "Present"/blank end as today: ${new Date().toISOString().slice(0,10)}).
+   - Classify each role into a primary "domain" (e.g., "Java Backend", "Frontend React", "Data Engineering",
+     "AI/ML Engineering", "DevOps", "QA", "Product Management", "Mobile iOS", etc.) and list its tech_focus.
+   - Detect domain transitions across consecutive jobs (e.g., Java Backend -> AI/ML Engineering). For each
+     transition record from_domain, to_domain, at_company, date, and tenure_in_new_role_months.
+   - Identify the current role and its tenure_months.
+   - Compute a stability_score 0-100 based on average tenure and frequency of role-hopping.
+   - Generate fitment_flags: short, recruiter-facing observations such as
+     "Recently switched from Java Backend to AI Engineering — only 3 months in the new role,
+      may not be ideal for a senior AI Engineer requirement". Severity: "info" | "warning" | "critical".
+     Always include at least one flag if there is a domain transition in the last 12 months with <12 months tenure.`;
 
 const TOOL = {
   type: "function",
