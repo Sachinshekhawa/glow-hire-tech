@@ -18,7 +18,7 @@ import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { getCandidate, refreshResumeUrl, type CandidateRow } from "@/data/jobsApi";
 import {
   listResumeVersions, addResumeVersion,
-  type ResumeVersionRow, type ResumeChange,
+  type ResumeVersionRow, type ResumeChange, type FitmentFlag,
 } from "@/data/resumeIntel";
 import { useToast } from "@/hooks/use-toast";
 
