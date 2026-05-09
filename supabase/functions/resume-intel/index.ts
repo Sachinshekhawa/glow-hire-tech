@@ -127,6 +127,66 @@ const TOOL = {
             technology_evolution: { type: "string" },
             company_progression: { type: "string" },
             leadership_growth: { type: "string" },
+            career_trajectory: {
+              type: "object",
+              properties: {
+                timeline: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      company: { type: "string" },
+                      title: { type: "string" },
+                      start: { type: "string" },
+                      end: { type: "string" },
+                      duration_months: { type: "number" },
+                      domain: { type: "string" },
+                      tech_focus: { type: "array", items: { type: "string" } },
+                      is_transition: { type: "boolean" },
+                      transition_note: { type: "string" },
+                    },
+                    required: ["company", "title", "duration_months", "domain"],
+                  },
+                },
+                domain_shifts: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      from_domain: { type: "string" },
+                      to_domain: { type: "string" },
+                      at_company: { type: "string" },
+                      date: { type: "string" },
+                      tenure_in_new_role_months: { type: "number" },
+                      note: { type: "string" },
+                    },
+                    required: ["from_domain", "to_domain", "tenure_in_new_role_months"],
+                  },
+                },
+                current_role: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    company: { type: "string" },
+                    domain: { type: "string" },
+                    tenure_months: { type: "number" },
+                    started: { type: "string" },
+                  },
+                },
+                stability_score: { type: "number" },
+                fitment_flags: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      severity: { type: "string", enum: ["info", "warning", "critical"] },
+                      message: { type: "string" },
+                    },
+                    required: ["severity", "message"],
+                  },
+                },
+              },
+            },
           },
           required: ["headline"],
         },
