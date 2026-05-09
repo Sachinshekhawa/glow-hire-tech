@@ -274,6 +274,136 @@ const CandidateDetail = () => {
               ))}
             </div>
           ) : tab === 1 ? (
+            // Career trajectory
+            (() => {
+              const ct = versions[0].evolution_summary?.career_trajectory;
+              if (!ct || (!ct.timeline?.length && !ct.fitment_flags?.length)) {
+                return <p className="text-sm text-muted-foreground">Trajectory analysis not available yet. Upload a resume to generate it.</p>;
+              }
+              const flagStyle = (s: FitmentFlag["severity"]) =>
+                s === "critical" ? { bg: "hsl(0 72% 55% / 0.1)", fg: "hsl(0 72% 40%)", border: "hsl(0 72% 55% / 0.4)", icon: <ShieldAlert className="h-4 w-4" /> }
+                  : s === "warning" ? { bg: "hsl(38 92% 50% / 0.12)", fg: "hsl(28 90% 35%)", border: "hsl(38 92% 50% / 0.4)", icon: <AlertTriangle className="h-4 w-4" /> }
+                    : { bg: "hsl(210 90% 55% / 0.1)", fg: "hsl(210 90% 40%)", border: "hsl(210 90% 55% / 0.4)", icon: <Info className="h-4 w-4" /> };
+              const fmtMonths = (m?: number) => {
+                if (!m && m !== 0) return "—";
+                if (m < 12) return `${m} mo`;
+                const y = Math.floor(m / 12); const r = m % 12;
+                return r ? `${y}y ${r}m` : `${y}y`;
+              };
+              return (
+                <div className="space-y-4">
+                  {/* Current role + stability */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {ct.current_role && (
+                      <Card variant="outlined" sx={{ gridColumn: { md: "span 2" } }}>
+                        <CardContent>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Briefcase className="h-4 w-4 text-primary" />
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Current role</p>
+                          </div>
+                          <p className="font-semibold text-base">
+                            {ct.current_role.title}{ct.current_role.company ? ` @ ${ct.current_role.company}` : ""}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+                            {ct.current_role.domain && <Chip size="small" label={ct.current_role.domain} color="primary" variant="outlined" />}
+                            <span className="text-muted-foreground inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {fmtMonths(ct.current_role.tenure_months)} in role
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {typeof ct.stability_score === "number" && (
+                      <Card variant="outlined">
+                        <CardContent>
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Stability score</p>
+                          </div>
+                          <p className="font-display text-2xl font-bold">{Math.round(ct.stability_score)}<span className="text-sm text-muted-foreground">/100</span></p>
+                          <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, ct.stability_score))}%` }} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Fitment flags */}
+                  {ct.fitment_flags?.length ? (
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Fitment signals</p>
+                      {ct.fitment_flags.map((f, i) => {
+                        const s = flagStyle(f.severity);
+                        return (
+                          <div key={i} className="flex items-start gap-2 rounded-md border p-3 text-sm" style={{ background: s.bg, borderColor: s.border, color: s.fg }}>
+                            <span className="mt-0.5">{s.icon}</span>
+                            <span><span className="font-semibold capitalize">{f.severity}:</span> {f.message}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {/* Domain shifts */}
+                  {ct.domain_shifts?.length ? (
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Domain transitions</p>
+                      <div className="space-y-2">
+                        {ct.domain_shifts.map((d, i) => (
+                          <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border p-2.5 text-sm bg-muted/30">
+                            <Chip size="small" label={d.from_domain || "?"} variant="outlined" />
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Chip size="small" label={d.to_domain || "?"} color="primary" />
+                            <span className="text-muted-foreground text-xs">
+                              {d.at_company ? `at ${d.at_company} · ` : ""}{fmtMonths(d.tenure_in_new_role_months)} in new role
+                            </span>
+                            {d.note && <span className="basis-full text-xs text-muted-foreground">{d.note}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Job timeline */}
+                  {ct.timeline?.length ? (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Job timeline</p>
+                      <div className="space-y-2">
+                        {ct.timeline.map((t, i) => (
+                          <div key={i} className="flex gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className={`h-2.5 w-2.5 rounded-full ${t.is_transition ? "bg-amber-500" : "bg-primary"}`} />
+                              {i < (ct.timeline?.length || 0) - 1 && <div className="w-px flex-1 bg-border my-1" />}
+                            </div>
+                            <div className="flex-1 rounded-md border p-3">
+                              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <p className="font-medium text-sm">
+                                  {t.title}{t.company ? <span className="text-muted-foreground"> @ {t.company}</span> : null}
+                                </p>
+                                <span className="text-xs text-muted-foreground">
+                                  {t.start || "?"} → {t.end || "Present"} · {fmtMonths(t.duration_months)}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {t.domain && <Chip size="small" label={t.domain} variant="outlined" color={t.is_transition ? "warning" : "default"} />}
+                                {t.tech_focus?.slice(0, 6).map((x) => <Chip key={x} size="small" label={x} />)}
+                              </div>
+                              {t.transition_note && (
+                                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 inline-flex items-center gap-1">
+                                  <AlertTriangle className="h-3 w-3" /> {t.transition_note}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()
+          ) : tab === 2 ? (
             // Latest changes for the selected version
             <div className="space-y-3">
               <TextField select size="small" label="Version" value={selectedVersionId || ""} onChange={(e) => setSelectedVersionId(e.target.value)} sx={{ minWidth: 200 }}>
@@ -292,7 +422,7 @@ const CandidateDetail = () => {
                 </>
               )}
             </div>
-          ) : tab === 2 ? (
+          ) : tab === 3 ? (
             // Career evolution from the latest version
             <div className="space-y-3 text-sm">
               {(() => {
