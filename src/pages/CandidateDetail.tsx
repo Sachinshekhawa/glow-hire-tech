@@ -226,8 +226,9 @@ const CandidateDetail = () => {
             <Sparkles className="h-4 w-4 text-primary" />
             <h2 className="font-display text-lg font-semibold">Resume Intelligence</h2>
           </div>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
             <Tab label="Timeline" />
+            <Tab label="Career trajectory" />
             <Tab label="Latest changes" />
             <Tab label="Career evolution" />
             <Tab label="Side-by-side" />
