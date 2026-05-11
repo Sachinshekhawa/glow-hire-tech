@@ -3,18 +3,21 @@ import { Link, useLocation } from "react-router-dom";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Divider from "@mui/material/Divider";
-import { Users, UserRound, ChevronDown } from "lucide-react";
+import { Users, UserRound, Building2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DashboardSwitcher = () => {
   const location = useLocation();
   const isManager = location.pathname.startsWith("/dashboard/manager");
+  const isDirector = location.pathname.startsWith("/dashboard/director");
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
 
-  const current = isManager
-    ? { label: "Manager view", icon: Users }
-    : { label: "Recruiter view", icon: UserRound };
+  const current = isDirector
+    ? { label: "Director view", icon: Building2 }
+    : isManager
+      ? { label: "Manager view", icon: Users }
+      : { label: "Recruiter view", icon: UserRound };
   const Icon = current.icon;
 
   return (
@@ -26,7 +29,11 @@ const DashboardSwitcher = () => {
         <span
           className={cn(
             "flex h-6 w-6 items-center justify-center rounded-md",
-            isManager ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary",
+            isDirector
+              ? "bg-emerald-500/15 text-emerald-500"
+              : isManager
+                ? "bg-accent/15 text-accent"
+                : "bg-primary/15 text-primary",
           )}
         >
           <Icon className="h-3.5 w-3.5" />
@@ -72,6 +79,20 @@ const DashboardSwitcher = () => {
           <div className="leading-tight">
             <div className="text-sm font-medium">Manager view</div>
             <div className="text-xs text-muted-foreground">Team performance & client scorecards</div>
+          </div>
+        </MenuItem>
+        <MenuItem
+          component={Link}
+          to="/dashboard/director"
+          onClick={() => setAnchorEl(null)}
+          sx={{ alignItems: "flex-start", gap: 1.5, py: 1.25 }}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-500 shrink-0">
+            <Building2 className="h-4 w-4" />
+          </span>
+          <div className="leading-tight">
+            <div className="text-sm font-medium">Director view</div>
+            <div className="text-xs text-muted-foreground">Managers, recruiters & client relations</div>
           </div>
         </MenuItem>
       </Menu>
