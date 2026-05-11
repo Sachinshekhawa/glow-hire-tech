@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import ManagerDashboard from "./pages/ManagerDashboard.tsx";
+import DirectorDashboard from "./pages/DirectorDashboard.tsx";
 import SystemBehavior from "./pages/SystemBehavior.tsx";
 import ClientFieldsAdmin from "./pages/ClientFieldsAdmin.tsx";
 import CreateJob from "./pages/CreateJob.tsx";
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard/manager" element={<ProtectedRoute><ManagerDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/director" element={<ProtectedRoute><DirectorDashboard /></ProtectedRoute>} />
             <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
             <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
             <Route path="/candidates" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
