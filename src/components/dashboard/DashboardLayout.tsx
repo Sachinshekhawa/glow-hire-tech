@@ -13,6 +13,7 @@ import {
   Bell,
   Plus,
   Sparkles,
+  Bot as BotIcon,
   LogOut,
 } from "lucide-react";
 import AppBar from "@mui/material/AppBar";
@@ -33,6 +34,7 @@ const nav = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
   { label: "Jobs", to: "/jobs", icon: Briefcase },
   { label: "Candidates", to: "/candidates", icon: Users },
+  { label: "AI Agents", to: "/agents", icon: BotIcon },
   { label: "Interviews", to: "/dashboard?tab=interviews", icon: CalendarClock },
   { label: "AI Interviews", to: "/dashboard?tab=ai", icon: Bot },
   { label: "Submissions", to: "/dashboard?tab=submissions", icon: Send },
@@ -137,6 +139,16 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
 
             <DateRangeFilter />
 
+            <Button
+              component={Link}
+              to="/agents"
+              variant="outlined"
+              size="small"
+              startIcon={<Sparkles className="h-4 w-4" />}
+              sx={{ display: { xs: "none", sm: "inline-flex" } }}
+            >
+              AI Agents
+            </Button>
             <Button
               component={Link}
               to="/create-job"
