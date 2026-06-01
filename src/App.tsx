@@ -50,6 +50,8 @@ const App = () => (
             <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
             <Route path="/candidates" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
             <Route path="/candidates/:id" element={<ProtectedRoute><CandidateDetail /></ProtectedRoute>} />
+            <Route path="/agents" element={<ProtectedRoute><AgentsHub /></ProtectedRoute>} />
+            <Route path="/agents/:agentId" element={<ProtectedRoute><AgentChat /></ProtectedRoute>} />
             <Route path="/create-job" element={<ProtectedRoute><CreateJob /></ProtectedRoute>} />
             <Route path="/admin/system-behavior" element={<ProtectedRoute><SystemBehavior /></ProtectedRoute>} />
             <Route path="/admin/client-fields" element={<ProtectedRoute><ClientFieldsAdmin /></ProtectedRoute>} />
