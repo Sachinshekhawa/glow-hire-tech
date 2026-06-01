@@ -13,6 +13,7 @@ import {
   Bell,
   Plus,
   Sparkles,
+  Bot as BotIcon,
   LogOut,
 } from "lucide-react";
 import AppBar from "@mui/material/AppBar";
