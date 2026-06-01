@@ -141,6 +141,16 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
 
             <Button
               component={Link}
+              to="/agents"
+              variant="outlined"
+              size="small"
+              startIcon={<Sparkles className="h-4 w-4" />}
+              sx={{ display: { xs: "none", sm: "inline-flex" } }}
+            >
+              AI Agents
+            </Button>
+            <Button
+              component={Link}
               to="/create-job"
               variant="contained"
               color="primary"
