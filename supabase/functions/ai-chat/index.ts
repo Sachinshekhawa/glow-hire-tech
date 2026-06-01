@@ -23,13 +23,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { messages } = await req.json();
+    const { messages, systemPrompt } = await req.json();
     if (!Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "messages array required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const system = typeof systemPrompt === "string" && systemPrompt.trim().length > 0
+      ? systemPrompt
+      : SYSTEM_PROMPT;
 
     const aiResp = await fetch(LOVABLE_AI_URL, {
       method: "POST",
@@ -40,7 +44,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         stream: true,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages.slice(-20)],
+        messages: [{ role: "system", content: system }, ...messages.slice(-20)],
       }),
     });
 
