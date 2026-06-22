@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import BlogIndex from "./pages/Blog.tsx";
+import Services from "./pages/Services.tsx";
 import BlogPost from "./pages/BlogPost.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
@@ -38,6 +39,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/services" element={<Services />} />
             <Route path="/blog" element={<BlogIndex />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/signin" element={<SignIn />} />
