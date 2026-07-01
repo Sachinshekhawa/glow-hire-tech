@@ -50,6 +50,7 @@ import {
 } from "@/data/jobsApi";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import PayRateCalculator from "@/components/PayRateCalculator";
 
 const STAGES: SubmissionStage[] = [
   "Submitted",
@@ -84,7 +85,7 @@ const JobDetail = () => {
 
   const [job, setJob] = useState<JobRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"overview" | "submissions" | "interviews" | "ai">("overview");
+  const [tab, setTab] = useState<"overview" | "submissions" | "interviews" | "payrate" | "ai">("overview");
 
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [interviews, setInterviews] = useState<InterviewRow[]>([]);
@@ -263,8 +264,42 @@ const JobDetail = () => {
         <Tab value="overview" label="Overview" />
         <Tab value="submissions" label={`Submissions (${submissions.length})`} />
         <Tab value="interviews" label={`Interviews (${interviews.length})`} />
+        <Tab value="payrate" label="Pay rate" />
         <Tab value="ai" icon={<Sparkles className="h-3.5 w-3.5" />} iconPosition="start" label="AI Tasks" />
       </Tabs>
+
+      {tab === "payrate" && (() => {
+        const rawBill = (job.client_answers as any)?.["cq-bill-rate"];
+        const parsedBill =
+          typeof rawBill === "number"
+            ? rawBill
+            : parseFloat(String(rawBill ?? "").replace(/[^0-9.]/g, "")) || 100;
+        const currencyMatch = String(rawBill ?? "").match(/USD|EUR|GBP|INR|CAD|AUD|SGD|AED|JPY|CHF/i);
+        const billCurrency = currencyMatch ? currencyMatch[0].toUpperCase() : "USD";
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <PayRateCalculator
+                initialBillRate={parsedBill}
+                initialBillCurrency={billCurrency}
+                initialPayCurrency={billCurrency}
+              />
+            </div>
+            <Card sx={{ p: 3 }}>
+              <h3 className="font-display text-base font-semibold mb-2">How this works</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Start with the client bill rate, then deduct employer taxes, benefits, overhead and your company margin.
+                The remaining amount is what you can offer the candidate. Convert to their preferred currency using live ECB rates.
+              </p>
+              <ul className="mt-3 text-xs space-y-1.5 text-muted-foreground">
+                <li>• Adjust sliders to match your engagement model.</li>
+                <li>• Rates refresh from Frankfurter (ECB) daily.</li>
+                <li>• Values are indicative — confirm with finance before offer.</li>
+              </ul>
+            </Card>
+          </div>
+        );
+      })()}
 
       {tab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

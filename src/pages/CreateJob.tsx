@@ -16,6 +16,7 @@ import {
   User,
   UserRound,
   Wand2,
+  Calculator,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
+import PayRateCalculator from "@/components/PayRateCalculator";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
@@ -211,6 +213,7 @@ const CreateJob = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState("");
   const [multiPick, setMultiPick] = useState<string[]>([]);
+  const [calcOpen, setCalcOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("job");
   const [completed, setCompleted] = useState(false); // both phases done
   const [editingId, setEditingId] = useState<string | null>(null); // job-question edit
@@ -827,6 +830,10 @@ const CreateJob = () => {
                 Change mode
               </Button>
             )}
+            <Button variant="ghost" size="sm" onClick={() => setCalcOpen(true)}>
+              <Calculator className="h-4 w-4" />
+              Pay rate
+            </Button>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/system-behavior">
                 <Settings2 className="h-4 w-4" />
@@ -1150,6 +1157,33 @@ const CreateJob = () => {
         </div>
         )}
       </main>
+
+      {/* Pay rate calculator */}
+      <Dialog open={calcOpen} onOpenChange={setCalcOpen}>
+        <DialogContent className="max-w-2xl p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Pay rate calculator</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const raw = clientAnswers["cq-bill-rate"];
+            const parsed =
+              typeof raw === "number"
+                ? raw
+                : parseFloat(String(raw ?? "").replace(/[^0-9.]/g, "")) || 100;
+            const m = String(raw ?? "").match(/USD|EUR|GBP|INR|CAD|AUD|SGD|AED|JPY|CHF/i);
+            const cur = m ? m[0].toUpperCase() : "USD";
+            return (
+              <PayRateCalculator
+                initialBillRate={parsed}
+                initialBillCurrency={cur}
+                initialPayCurrency={cur}
+                className="border-0 shadow-none"
+              />
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
 
       {/* Edit JOB answer */}
       <EditJobAnswerDialog
