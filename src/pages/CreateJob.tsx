@@ -1158,6 +1158,33 @@ const CreateJob = () => {
         )}
       </main>
 
+      {/* Pay rate calculator */}
+      <Dialog open={calcOpen} onOpenChange={setCalcOpen}>
+        <DialogContent className="max-w-2xl p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Pay rate calculator</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const raw = clientAnswers["cq-bill-rate"];
+            const parsed =
+              typeof raw === "number"
+                ? raw
+                : parseFloat(String(raw ?? "").replace(/[^0-9.]/g, "")) || 100;
+            const m = String(raw ?? "").match(/USD|EUR|GBP|INR|CAD|AUD|SGD|AED|JPY|CHF/i);
+            const cur = m ? m[0].toUpperCase() : "USD";
+            return (
+              <PayRateCalculator
+                initialBillRate={parsed}
+                initialBillCurrency={cur}
+                initialPayCurrency={cur}
+                className="border-0 shadow-none"
+              />
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+
       {/* Edit JOB answer */}
       <EditJobAnswerDialog
         question={
