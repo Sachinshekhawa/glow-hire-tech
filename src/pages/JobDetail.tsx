@@ -85,7 +85,7 @@ const JobDetail = () => {
 
   const [job, setJob] = useState<JobRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"overview" | "submissions" | "interviews" | "ai">("overview");
+  const [tab, setTab] = useState<"overview" | "submissions" | "interviews" | "payrate" | "ai">("overview");
 
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [interviews, setInterviews] = useState<InterviewRow[]>([]);
