@@ -16,6 +16,7 @@ import {
   User,
   UserRound,
   Wand2,
+  Calculator,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import ThemeToggle from "@/components/ThemeToggle";
+import PayRateCalculator from "@/components/PayRateCalculator";
 
 import { ChatQuestion, Condition } from "@/data/chatQuestions";
 import { loadQuestions } from "@/data/chatQuestionsStore";
