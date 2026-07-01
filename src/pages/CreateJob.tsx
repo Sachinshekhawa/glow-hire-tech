@@ -829,6 +829,10 @@ const CreateJob = () => {
                 Change mode
               </Button>
             )}
+            <Button variant="ghost" size="sm" onClick={() => setCalcOpen(true)}>
+              <Calculator className="h-4 w-4" />
+              Pay rate
+            </Button>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/system-behavior">
                 <Settings2 className="h-4 w-4" />
