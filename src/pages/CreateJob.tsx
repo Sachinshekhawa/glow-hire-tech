@@ -213,6 +213,7 @@ const CreateJob = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState("");
   const [multiPick, setMultiPick] = useState<string[]>([]);
+  const [calcOpen, setCalcOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("job");
   const [completed, setCompleted] = useState(false); // both phases done
   const [editingId, setEditingId] = useState<string | null>(null); // job-question edit
