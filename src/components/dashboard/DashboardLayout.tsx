@@ -15,6 +15,7 @@ import {
   Sparkles,
   Bot as BotIcon,
   LogOut,
+  Workflow,
 } from "lucide-react";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
