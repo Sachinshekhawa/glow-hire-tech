@@ -7,6 +7,7 @@ const navLinks = [
   { label: "Product", href: "/#showcase" },
   { label: "Features", href: "/#features" },
   { label: "Services", href: "/services" },
+  { label: "Agentic AI", href: "/agentic-ai" },
   { label: "Communication", href: "/#comms" },
   { label: "Pricing", href: "/#pricing" },
   { label: "Blog", href: "/blog" },
