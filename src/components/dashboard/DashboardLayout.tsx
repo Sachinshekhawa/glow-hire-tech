@@ -15,6 +15,7 @@ import {
   Sparkles,
   Bot as BotIcon,
   LogOut,
+  Workflow,
 } from "lucide-react";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
@@ -35,6 +36,7 @@ const nav = [
   { label: "Jobs", to: "/jobs", icon: Briefcase },
   { label: "Candidates", to: "/candidates", icon: Users },
   { label: "AI Agents", to: "/agents", icon: BotIcon },
+  { label: "Agentic Workflow", to: "/agents/workflow", icon: Workflow },
   { label: "Interviews", to: "/dashboard?tab=interviews", icon: CalendarClock },
   { label: "AI Interviews", to: "/dashboard?tab=ai", icon: Bot },
   { label: "Submissions", to: "/dashboard?tab=submissions", icon: Send },

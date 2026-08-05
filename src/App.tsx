@@ -23,6 +23,7 @@ import Candidates from "./pages/Candidates.tsx";
 import CandidateDetail from "./pages/CandidateDetail.tsx";
 import AgentsHub from "./pages/AgentsHub.tsx";
 import AgentChat from "./pages/AgentChat.tsx";
+import AgenticWorkflow from "./pages/AgenticWorkflow.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
 import MuiThemeBridge from "./components/MuiThemeBridge";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -53,6 +54,7 @@ const App = () => (
             <Route path="/candidates" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
             <Route path="/candidates/:id" element={<ProtectedRoute><CandidateDetail /></ProtectedRoute>} />
             <Route path="/agents" element={<ProtectedRoute><AgentsHub /></ProtectedRoute>} />
+            <Route path="/agents/workflow" element={<ProtectedRoute><AgenticWorkflow /></ProtectedRoute>} />
             <Route path="/agents/:agentId" element={<ProtectedRoute><AgentChat /></ProtectedRoute>} />
             <Route path="/create-job" element={<ProtectedRoute><CreateJob /></ProtectedRoute>} />
             <Route path="/admin/system-behavior" element={<ProtectedRoute><SystemBehavior /></ProtectedRoute>} />
