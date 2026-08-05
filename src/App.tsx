@@ -54,6 +54,7 @@ const App = () => (
             <Route path="/candidates" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
             <Route path="/candidates/:id" element={<ProtectedRoute><CandidateDetail /></ProtectedRoute>} />
             <Route path="/agents" element={<ProtectedRoute><AgentsHub /></ProtectedRoute>} />
+            <Route path="/agents/workflow" element={<ProtectedRoute><AgenticWorkflow /></ProtectedRoute>} />
             <Route path="/agents/:agentId" element={<ProtectedRoute><AgentChat /></ProtectedRoute>} />
             <Route path="/create-job" element={<ProtectedRoute><CreateJob /></ProtectedRoute>} />
             <Route path="/admin/system-behavior" element={<ProtectedRoute><SystemBehavior /></ProtectedRoute>} />
