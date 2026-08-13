@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      candidate_profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          expected_salary: string | null
+          experience_years: number
+          full_name: string
+          headline: string | null
+          id: string
+          linkedin_url: string | null
+          location: string | null
+          notice_period: string | null
+          open_to_work: boolean
+          phone: string | null
+          portfolio_url: string | null
+          preferred_locations: string[]
+          preferred_roles: string[]
+          resume_filename: string | null
+          resume_path: string | null
+          resume_updated_at: string | null
+          resume_url: string | null
+          skills: string[]
+          summary: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          expected_salary?: string | null
+          experience_years?: number
+          full_name?: string
+          headline?: string | null
+          id?: string
+          linkedin_url?: string | null
+          location?: string | null
+          notice_period?: string | null
+          open_to_work?: boolean
+          phone?: string | null
+          portfolio_url?: string | null
+          preferred_locations?: string[]
+          preferred_roles?: string[]
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_updated_at?: string | null
+          resume_url?: string | null
+          skills?: string[]
+          summary?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          expected_salary?: string | null
+          experience_years?: number
+          full_name?: string
+          headline?: string | null
+          id?: string
+          linkedin_url?: string | null
+          location?: string | null
+          notice_period?: string | null
+          open_to_work?: boolean
+          phone?: string | null
+          portfolio_url?: string | null
+          preferred_locations?: string[]
+          preferred_roles?: string[]
+          resume_filename?: string | null
+          resume_path?: string | null
+          resume_updated_at?: string | null
+          resume_url?: string | null
+          skills?: string[]
+          summary?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       candidate_resume_versions: {
         Row: {
           candidate_id: string
@@ -180,9 +258,11 @@ export type Database = {
       }
       job_submissions: {
         Row: {
+          applied_via: string | null
           candidate_email: string | null
           candidate_name: string
           candidate_phone: string | null
+          candidate_user_id: string | null
           created_at: string
           created_by: string
           id: string
@@ -196,9 +276,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          applied_via?: string | null
           candidate_email?: string | null
           candidate_name: string
           candidate_phone?: string | null
+          candidate_user_id?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -212,9 +294,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          applied_via?: string | null
           candidate_email?: string | null
           candidate_name?: string
           candidate_phone?: string | null
+          candidate_user_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -333,15 +417,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "recruiter" | "candidate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -468,6 +579,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "recruiter", "candidate"],
+    },
   },
 } as const
