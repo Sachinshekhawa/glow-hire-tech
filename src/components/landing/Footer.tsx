@@ -17,6 +17,10 @@ const cols = [
     title: "Resources",
     links: ["Docs", "API Reference", "Blog", "Changelog", "Security"],
   },
+  {
+    title: "Candidates",
+    links: ["Candidate Portal"],
+  },
 ];
 
 const Footer = () => {

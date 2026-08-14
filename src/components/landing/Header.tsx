@@ -63,6 +63,9 @@ const Header = () => {
             <a href="/admin/system-behavior">Admin</a>
           </Button>
           <Button variant="ghost" size="sm" asChild>
+            <a href="/candidate/signin">For candidates</a>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
             <a href="/signin">Sign in</a>
           </Button>
           <Button variant="hero" size="sm" asChild>
@@ -95,6 +98,13 @@ const Header = () => {
                 {l.label}
               </a>
             ))}
+            <a
+              href="/candidate/signin"
+              onClick={() => setOpen(false)}
+              className="py-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              For candidates
+            </a>
             <Button variant="hero" size="sm" asChild>
               <a href="#cta" onClick={() => setOpen(false)}>Book Demo</a>
             </Button>
