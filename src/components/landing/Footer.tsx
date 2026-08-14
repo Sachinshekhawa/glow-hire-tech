@@ -3,23 +3,48 @@ import { Sparkles, Twitter, Linkedin, Github } from "lucide-react";
 const cols = [
   {
     title: "Product",
-    links: ["AI Recruiter", "Unified Inbox", "AI Interviews", "Assessments", "Workflow Builder", "Analytics"],
+    links: [
+      { label: "AI Recruiter", href: "#" },
+      { label: "Unified Inbox", href: "#" },
+      { label: "AI Interviews", href: "#" },
+      { label: "Assessments", href: "#" },
+      { label: "Workflow Builder", href: "#" },
+      { label: "Analytics", href: "#" },
+    ],
   },
   {
     title: "Solutions",
-    links: ["Staffing Agencies", "Enterprise HR", "Tech Hiring", "Volume Hiring", "Global Hiring"],
+    links: [
+      { label: "Staffing Agencies", href: "#" },
+      { label: "Enterprise HR", href: "#" },
+      { label: "Tech Hiring", href: "#" },
+      { label: "Volume Hiring", href: "#" },
+      { label: "Global Hiring", href: "#" },
+    ],
   },
   {
     title: "Company",
-    links: ["About", "Customers", "Careers", "Press", "Contact"],
+    links: [
+      { label: "About", href: "#" },
+      { label: "Customers", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Press", href: "#" },
+      { label: "Contact", href: "#" },
+    ],
   },
   {
     title: "Resources",
-    links: ["Docs", "API Reference", "Blog", "Changelog", "Security"],
+    links: [
+      { label: "Docs", href: "#" },
+      { label: "API Reference", href: "#" },
+      { label: "Blog", href: "/blog" },
+      { label: "Changelog", href: "#" },
+      { label: "Security", href: "#" },
+    ],
   },
   {
     title: "Candidates",
-    links: ["Candidate Portal"],
+    links: [{ label: "Candidate Portal", href: "/candidate/signin" }],
   },
 ];
 
@@ -59,9 +84,9 @@ const Footer = () => {
               <h4 className="text-sm font-semibold">{c.title}</h4>
               <ul className="mt-4 space-y-2.5">
                 {c.links.map((l) => (
-                  <li key={l}>
-                    <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      {l}
+                  <li key={l.label}>
+                    <a href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      {l.label}
                     </a>
                   </li>
                 ))}
