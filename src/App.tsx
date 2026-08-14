@@ -12,6 +12,8 @@ import BlogPost from "./pages/BlogPost.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import CandidateAuth from "./pages/CandidateAuth.tsx";
+import CandidatePortal from "./pages/CandidatePortal.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import ManagerDashboard from "./pages/ManagerDashboard.tsx";
 import DirectorDashboard from "./pages/DirectorDashboard.tsx";
@@ -28,6 +30,7 @@ import AgenticWorkflow from "./pages/AgenticWorkflow.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
 import MuiThemeBridge from "./components/MuiThemeBridge";
 import ProtectedRoute from "./components/ProtectedRoute";
+import CandidateRoute from "./components/CandidateRoute";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,8 @@ const App = () => (
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/candidate/signin" element={<CandidateAuth />} />
+            <Route path="/portal" element={<CandidateRoute><CandidatePortal /></CandidateRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard/manager" element={<ProtectedRoute><ManagerDashboard /></ProtectedRoute>} />
             <Route path="/dashboard/director" element={<ProtectedRoute><DirectorDashboard /></ProtectedRoute>} />
