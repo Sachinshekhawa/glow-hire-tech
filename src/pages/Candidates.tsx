@@ -33,6 +33,13 @@ const Candidates = () => {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [filters, setFilters] = useState<CandidateFilters>(emptyCandidateFilters);
+
+  const filtered = useMemo(
+    () => applyCandidateFilters(items || [], filters),
+    [items, filters],
+  );
+
 
   useEffect(() => {
     listCandidates()
