@@ -228,8 +228,11 @@ const Candidates = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+          )}
+        </>
       )}
+
     </DashboardLayout>
   );
 };
