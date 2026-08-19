@@ -163,7 +163,7 @@ const Candidates = () => {
         )}
       </Card>
 
-      {/* List */}
+      {/* Filters + list */}
       {items === null ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -179,8 +179,20 @@ const Candidates = () => {
           <p className="text-sm text-muted-foreground mt-1">Upload a resume to get started.</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {items.map((c) => (
+        <>
+          <CandidateFilterBar value={filters} onChange={setFilters} rows={items} resultCount={filtered.length} />
+          {filtered.length === 0 ? (
+            <Card sx={{ p: 6, textAlign: "center" }}>
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-display text-lg font-semibold">No matches</h3>
+              <p className="text-sm text-muted-foreground mt-1">Try clearing a filter or two.</p>
+            </Card>
+          ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {filtered.map((c) => (
+
             <Card key={c.id} sx={{ transition: "transform 200ms, box-shadow 200ms", "&:hover": { transform: "translateY(-2px)", boxShadow: "var(--shadow-elegant)" } }}>
               <CardContent sx={{ p: 2.5 }}>
                 <div className="flex items-start gap-3">
