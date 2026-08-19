@@ -17,8 +17,14 @@ import {
   type CandidateRow,
 } from "@/data/jobsApi";
 import { useToast } from "@/hooks/use-toast";
+import CandidateFilterBar, {
+  applyCandidateFilters,
+  emptyCandidateFilters,
+  type CandidateFilters,
+} from "@/components/candidates/CandidateFilterBar";
 
 const ACCEPT = ".pdf,.doc,.docx,.txt,.rtf";
+
 
 const Candidates = () => {
   const { toast } = useToast();
